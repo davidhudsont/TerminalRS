@@ -107,6 +107,21 @@ impl eframe::epi::App for MyApp {
                         }
                     }
                 }
+                if ui.button("xModem Receive").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().save_file() {
+                        let picked_path = Some(path.display().to_string());
+                        println!("Picked path: {:?}", picked_path);
+
+                        let mut xmodem = XModem::new();
+                        let stream = File::create(picked_path.unwrap()).unwrap();
+                        let port = self.serial_port.as_mut().unwrap();
+
+                        match xmodem.receive(port, Box::new(stream), false) {
+                            Ok(bytes) => println!("File Receive success, Bytes: {bytes} read."),
+                            Err(err) => println!("Error: {err}"),
+                        }
+                    }
+                }
             });
         });
 
