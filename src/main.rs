@@ -19,6 +19,25 @@ fn main() {
     );
 }
 
+// fn main() {
+//     let builder = serialport::new("COM11", 115200)
+//         .data_bits(DataBits::Eight)
+//         .stop_bits(StopBits::One);
+
+//     let mut port = builder.open().expect("Failed to open port");
+//     port.set_timeout(Duration::new(1, 0)).unwrap();
+
+//     let mut xmodem: XModem = XModem::new();
+
+//     let stream = File::open("example.txt").unwrap();
+//     xmodem.send(&mut port, Box::new(stream)).unwrap();
+
+//     // let stream = File::create("example2.txt").unwrap();
+//     // xmodem.receive(Box::new(stream), true).unwrap();
+
+// }
+
+
 #[derive(Debug, PartialEq)]
 enum ComPort
 {
@@ -77,6 +96,15 @@ impl eframe::epi::App for MyApp {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         let picked_path = Some(path.display().to_string());
                         println!("Picked path: {:?}", picked_path);
+
+                        let mut xmodem = XModem::new();
+                        let stream = File::open(picked_path.unwrap()).unwrap();
+                        let port = self.serial_port.as_mut().unwrap();
+
+                        match xmodem.send(port, Box::new(stream)) {
+                            Ok(()) => println!("File Send success"),
+                            Err(err) => println!("Error: {err}"),
+                        }
                     }
                 }
             });
@@ -118,7 +146,7 @@ impl eframe::epi::App for MyApp {
                     match &self.selected_comport {
                         ComPort::None => println!("Select a valid Comport!!!!"),
                         ComPort::COMPORT(port_name) => {
-                            if let Ok(port) = serialport::new(port_name, 9600).timeout(Duration::from_millis(100)).open() {
+                            if let Ok(port) = serialport::new(port_name, 115200).timeout(Duration::from_millis(100)).open() {
                                 self.serial_port = Some(port);
                                 println!("Opened the Serial Port!");
                             }
@@ -205,21 +233,4 @@ impl eframe::epi::App for MyApp {
     }
 }
 
-// fn main() {
-//     let builder = serialport::new("COM11", 115200)
-//         .data_bits(DataBits::Eight)
-//         .stop_bits(StopBits::One);
-
-//     let mut port = builder.open().expect("Failed to open port");
-//     port.set_timeout(Duration::new(1, 0)).unwrap();
-
-//     let mut xmodem: XModem = XModem::new(port);
-
-//     let stream = File::open("example.txt").unwrap();
-//     xmodem.send(Box::new(stream)).unwrap();
-
-//     // let stream = File::create("example2.txt").unwrap();
-//     // xmodem.receive(Box::new(stream), true).unwrap();
-
-// }
 

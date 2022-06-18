@@ -5,8 +5,6 @@ use std::io::{Read, Write};
 
 pub struct XModem
 {
-    /// Serial device
-    uart: Box<dyn SerialPort>,
     /// Maximum retries
     retries: i32,
     /// Padding bytes
@@ -25,10 +23,9 @@ const CRC: u8 = 0x43;
 
 impl XModem
 {
-    pub fn new(device: Box<dyn SerialPort>) -> Self
+    pub fn new() -> Self
     {
         Self {
-            uart: device,
             retries: 16,
             padbyte: SUB,
         }
@@ -46,19 +43,19 @@ impl XModem
         self
     }
 
-    fn send_byte(&mut self, byte: u8) {
+    fn send_byte(&mut self, device: &mut Box<dyn SerialPort>, byte: u8) {
         let packet: Vec<u8> = vec![byte];
-        self.uart.as_mut().write(&packet[..]).expect("Failed to send byte");
+        device.write(&packet[..]).expect("Failed to send byte");
     }
 
     /// Receives to a stream on the XModem protocol
-    pub fn receive(&mut self, mut stream: Box<dyn Write>, crc_mode: bool) -> Result<usize, &'static str> {
+    pub fn receive(&mut self, device: &mut Box<dyn SerialPort>, mut stream: Box<dyn Write>, crc_mode: bool) -> Result<usize, &'static str> {
         let mut errors = 0;
         let mut size = 0;
         let mut cancel = false;
         // Synchronization
         let buf = if crc_mode {vec![CRC]}  else { vec![NAK]};
-        self.uart.as_mut().write(&buf[..]).expect("Sync I/O failure");
+        device.write(&buf[..]).expect("Sync I/O failure");
         // Receive Packets
         let mut data_length: usize = 128;
         let mut packet_num: u8 = 1;
@@ -66,7 +63,7 @@ impl XModem
 
             let mut header = vec![0; 1];
             // Read Header
-            match self.uart.as_mut().read(&mut header) {
+            match device.read(&mut header) {
                 Ok(_) => {
                     println!("Data received {:?}", header);
 
@@ -83,7 +80,7 @@ impl XModem
                             continue;
                         }
                         _ => {
-                            self.uart.as_mut().write(&buf[..]).expect("Sync I/O failure");
+                            device.write(&buf[..]).expect("Sync I/O failure");
                             errors += 1;
                             if errors > self.retries {
                                 return Err("Synchronization failed, reached max number of retries");
@@ -103,7 +100,7 @@ impl XModem
             // Read rest of packet.
             let packet_length = if crc_mode { data_length + 4 } else { data_length + 3};
             let mut packet = vec![0; packet_length];
-            match self.uart.as_mut().read(&mut packet) {
+            match device.read(&mut packet) {
                 Ok(_) => {
                     println!("Data received {:?}", packet);
 
@@ -112,13 +109,13 @@ impl XModem
                     if (pn1 + pn2) != 0xff {
                         println!("Error Packet Number was not expected");
                         errors += 1;
-                        self.send_byte(NAK);
+                        self.send_byte(device, NAK);
                         continue;
                     }
                     else if pn1 != packet_num {
                         println!("Error Packet Number was not expected");
                         errors += 1;
-                        self.send_byte(NAK);
+                        self.send_byte(device, NAK);
                         continue;
                     }
                     if errors > self.retries {
@@ -132,7 +129,7 @@ impl XModem
                         {
                             println!("CRC error: theirs {received_crc}, ours {calc_crc}");
                             errors += 1;
-                            self.send_byte(NAK);
+                            self.send_byte(device, NAK);
                             continue;
                         }
                     }
@@ -142,7 +139,7 @@ impl XModem
                         if calc_checksum != received_checksum {
                             println!("Check sum error: theirs {received_checksum}, ours {calc_checksum}");
                             errors += 1;
-                            self.send_byte(NAK);
+                            self.send_byte(device, NAK);
                             continue;
                         }
                     }
@@ -150,7 +147,7 @@ impl XModem
                     size += data_length;
                     stream.as_mut().write(&packet[2..packet_length - 1]).expect("Failed to write to stream");
                     println!("Send ACK");
-                    self.send_byte(ACK);
+                    self.send_byte(device, ACK);
                     packet_num += 1;
 
                 }
@@ -162,13 +159,13 @@ impl XModem
                 }
             }
         }
-        self.send_byte(ACK);
+        self.send_byte(device, ACK);
         println!("Data received, size: {size}");
         Ok(size)
     }
 
     /// Sends a stream over the XModem protocol
-    pub fn send(&mut self, mut stream: Box<dyn Read>) -> Result<(), &'static str> {
+    pub fn send(&mut self, device: &mut Box<dyn SerialPort>, mut stream: Box<dyn Read>) -> Result<(), &'static str> {
         let mut errors = 0;
 
         let mut cancel = false;
@@ -176,7 +173,7 @@ impl XModem
         // Synchronize with Reciever
         loop {
             let mut bytes = [0; 1];
-            match self.uart.as_mut().read(&mut bytes) {
+            match device.read(&mut bytes) {
                 Ok(_) => {
                     let byte = bytes[0];
                     println!("Receiver Byte: {}, Errors: {}", byte, errors);
@@ -203,8 +200,9 @@ impl XModem
                         }
                     }
                 }
-                _ => {
+                Err(err) => {
                     errors += 1;
+                    println!("Error Count: {errors}, Error: {err}");
                     if errors > self.retries {
                         return Err("Synchronization failed, reached max number of retries");
                     }
@@ -216,7 +214,7 @@ impl XModem
         errors = 0;
         let packet_length: usize = 128;
         let mut packet_num: u8 = 1;
-        self.uart.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+        device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
         loop {
             let mut data: Vec<u8> = vec![self.padbyte; packet_length];
             match stream.as_mut().read(&mut data) {
@@ -224,7 +222,7 @@ impl XModem
                 Ok(len) => {
                     loop {
                         // Emit Packet
-                        let mut packet: Vec<u8> = vec![0];
+                        let mut packet: Vec<u8> = vec![];
                         let seq2: u8 = 0xff - packet_num;
                         println!("PacketNum: {}", packet_num);
                         println!("PacketNum Inverse: {}", seq2);
@@ -250,12 +248,13 @@ impl XModem
                             println!("Checksum: {}", checksum);
                             packet.push(checksum);
                         }
-                        self.uart.as_mut().write(&packet[..]).expect("Failed to Send Bytes");
-                        self.uart.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
-                        assert!(self.uart.bytes_to_read().unwrap() == 0);
+                        device.write(&packet[..]).expect("Failed to Send Bytes");
+                        println!("Packet to send: {:?}", packet);
+                        device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+                        assert!(device.bytes_to_read().unwrap() == 0);
                         let mut bytes = [0; 1];
                         // Get Receiver ACK
-                        match self.uart.as_mut().read_exact(&mut bytes) {
+                        match device.read_exact(&mut bytes) {
                             Ok(_) => {
                                 println!("Data received {:?}", bytes);
                                 let byte = bytes[0];
@@ -301,11 +300,11 @@ impl XModem
         // End of Transmission Sync
         loop {
             let packet: Vec<u8> = vec![EOT];
-            self.uart.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
-            assert!(self.uart.bytes_to_read().unwrap() == 0);
-            self.uart.as_mut().write(&packet[..]).expect("Failed Send Transmission Byte");
+            device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+            assert!(device.bytes_to_read().unwrap() == 0);
+            device.write(&packet[..]).expect("Failed Send Transmission Byte");
             let mut bytes = [0; 1];
-            match  self.uart.as_mut().read_exact(&mut bytes) {
+            match  device.read_exact(&mut bytes) {
                 Ok(_) => {
                     let byte = bytes[0];
                     println!("End Sync Received Byte: {}, Errors: {}", byte, errors);
