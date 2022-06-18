@@ -299,10 +299,9 @@ impl XModem
 
         // End of Transmission Sync
         loop {
-            let packet: Vec<u8> = vec![EOT];
             device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
             assert!(device.bytes_to_read().unwrap() == 0);
-            device.write(&packet[..]).expect("Failed Send Transmission Byte");
+            self.send_byte(device, EOT);
             let mut bytes = [0; 1];
             match  device.read_exact(&mut bytes) {
                 Ok(_) => {
