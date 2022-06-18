@@ -155,7 +155,12 @@ impl XModem
                     stream.as_mut().write(&packet[2..packet_length - 1]).expect("Failed to write to stream");
                     println!("Send ACK");
                     self.send_byte(device, ACK);
-                    packet_num += 1;
+                    if packet_num == 255 {
+                        packet_num = 0;
+                    }
+                    else {
+                        packet_num += 1;
+                    }
 
                 }
                 _ => {
@@ -265,7 +270,9 @@ impl XModem
                                         if packet_num == 255 {
                                             packet_num = 0;
                                         }
-                                        packet_num += 1;
+                                        else {
+                                            packet_num += 1;
+                                        }
                                         break;
                                     }
                                     NAK => {
