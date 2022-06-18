@@ -48,6 +48,14 @@ impl XModem
         device.write(&packet[..]).expect("Failed to send byte");
     }
 
+    fn read_byte(&mut self, device: &mut Box<dyn SerialPort>) -> Result<u8, std::io::Error> {
+        let mut bytes = [0; 1];
+        match device.read(&mut bytes) {
+            Ok(_) => Ok(bytes[0]),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Receives to a stream on the XModem protocol
     pub fn receive(&mut self, device: &mut Box<dyn SerialPort>, mut stream: Box<dyn Write>, crc_mode: bool) -> Result<usize, &'static str> {
         let mut errors = 0;
@@ -61,13 +69,11 @@ impl XModem
         let mut packet_num: u8 = 1;
         loop {
 
-            let mut header = vec![0; 1];
             // Read Header
-            match device.read(&mut header) {
-                Ok(_) => {
+            match self.read_byte(device) {
+                Ok(header) => {
                     println!("Data received {:?}", header);
-
-                    match header[0] {
+                    match header {
                         SOH => data_length = 128,
                         STX => data_length = 1024,
                         EOT => break,
@@ -89,8 +95,9 @@ impl XModem
                         }
                     }
                 }
-                _ => {
+                Err(err) => {
                     errors += 1;
+                    println!("Error Count: {errors}, Error: {err}");
                     if errors > self.retries {
                         return Err("Packet Send Failed, reached max number of retries");
                     }
@@ -172,12 +179,10 @@ impl XModem
         let mut crc_mode = false;
         // Synchronize with Reciever
         loop {
-            let mut bytes = [0; 1];
-            match device.read(&mut bytes) {
-                Ok(_) => {
-                    let byte = bytes[0];
-                    println!("Receiver Byte: {}, Errors: {}", byte, errors);
-                    match byte {
+            match self.read_byte(device) {
+                Ok(header) => {
+                    println!("Receiver Byte: {}, Errors: {}", header, errors);
+                    match header {
                         NAK => break,
                         CRC => {
                             println!("Use CRC Mode");
@@ -204,7 +209,7 @@ impl XModem
                     errors += 1;
                     println!("Error Count: {errors}, Error: {err}");
                     if errors > self.retries {
-                        return Err("Synchronization failed, reached max number of retries");
+                        return Err("Packet Send Failed, reached max number of retries");
                     }
                 }
             }
@@ -252,13 +257,9 @@ impl XModem
                         println!("Packet to send: {:?}", packet);
                         device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
                         assert!(device.bytes_to_read().unwrap() == 0);
-                        let mut bytes = [0; 1];
                         // Get Receiver ACK
-                        match device.read_exact(&mut bytes) {
-                            Ok(_) => {
-                                println!("Data received {:?}", bytes);
-                                let byte = bytes[0];
-                                println!("Receiver Byte: {}, Errors: {}", byte, errors);
+                        match self.read_byte(device) {
+                            Ok(byte) => {
                                 match byte {
                                     ACK => {
                                         if packet_num == 255 {
@@ -282,8 +283,9 @@ impl XModem
                                     }
                                 }
                             }
-                            _ => {
+                            Err(err) => {
                                 errors += 1;
+                                println!("Error Count: {errors}, Error: {err}");
                                 if errors > self.retries {
                                     return Err("Packet Send Failed, reached max number of retries");
                                 }
