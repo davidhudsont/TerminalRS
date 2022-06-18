@@ -46,14 +46,9 @@ impl XModem
         self
     }
 
-    fn send_nak(&mut self) {
-        let packet: Vec<u8> = vec![NAK];
-        self.uart.as_mut().write(&packet[..]).expect("Failed Send Transmission Byte");
-    }
-
-    fn send_ack(&mut self) {
-        let packet: Vec<u8> = vec![ACK];
-        self.uart.as_mut().write(&packet[..]).expect("Failed Send Transmission Byte");
+    fn send_byte(&mut self, byte: u8) {
+        let packet: Vec<u8> = vec![byte];
+        self.uart.as_mut().write(&packet[..]).expect("Failed to send byte");
     }
 
     /// Receives to a stream on the XModem protocol
@@ -117,13 +112,13 @@ impl XModem
                     if (pn1 + pn2) != 0xff {
                         println!("Error Packet Number was not expected");
                         errors += 1;
-                        self.send_nak();
+                        self.send_byte(NAK);
                         continue;
                     }
                     else if pn1 != packet_num {
                         println!("Error Packet Number was not expected");
                         errors += 1;
-                        self.send_nak();
+                        self.send_byte(NAK);
                         continue;
                     }
                     if errors > self.retries {
@@ -137,7 +132,7 @@ impl XModem
                         {
                             println!("CRC error: theirs {received_crc}, ours {calc_crc}");
                             errors += 1;
-                            self.send_nak();
+                            self.send_byte(NAK);
                             continue;
                         }
                     }
@@ -147,7 +142,7 @@ impl XModem
                         if calc_checksum != received_checksum {
                             println!("Check sum error: theirs {received_checksum}, ours {calc_checksum}");
                             errors += 1;
-                            self.send_nak();
+                            self.send_byte(NAK);
                             continue;
                         }
                     }
@@ -155,7 +150,7 @@ impl XModem
                     size += data_length;
                     stream.as_mut().write(&packet[2..packet_length - 1]).expect("Failed to write to stream");
                     println!("Send ACK");
-                    self.send_ack();
+                    self.send_byte(ACK);
                     packet_num += 1;
 
                 }
@@ -167,7 +162,7 @@ impl XModem
                 }
             }
         }
-        self.send_ack();
+        self.send_byte(ACK);
         println!("Data received, size: {size}");
         Ok(size)
     }
