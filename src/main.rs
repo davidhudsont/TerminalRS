@@ -213,7 +213,7 @@ impl eframe::epi::App for MyApp {
                                 // Newlines are handled by `Key::Enter`.
                                 if !text_to_insert.is_empty() && text_to_insert != "\n" && text_to_insert != "\r" {
                                     self.serial_port.as_mut().unwrap().write(text_to_insert.as_bytes()).unwrap();
-                                    let mut read_buffer: Vec<u8> = vec![0; 1000];
+                                    let mut read_buffer: Vec<u8> = vec![0; 1];
                                     match self.serial_port.as_mut().unwrap().read(&mut read_buffer[..]) {
                                         Err(err) => println!("Got an IO Error: {err}"),
                                         Ok(bytes) => println!("Bytes read: {bytes}"),
@@ -228,7 +228,7 @@ impl eframe::epi::App for MyApp {
                                 ..
                             } => {
                                 self.serial_port.as_mut().unwrap().write("\r\n".as_bytes()).unwrap();
-                                let mut read_buffer: Vec<u8> = vec![0; 1000];
+                                let mut read_buffer: Vec<u8> = vec![0; 1];
                                 match self.serial_port.as_mut().unwrap().read(&mut read_buffer[..]) {
                                     Err(err) => println!("Got an IO Error: {err}"),
                                     Ok(bytes) => println!("Bytes read: {bytes}"),
@@ -241,6 +241,7 @@ impl eframe::epi::App for MyApp {
                 }
             });
         });
+        ctx.request_repaint();
     }
 
     fn name(&self) -> &str {
