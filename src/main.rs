@@ -30,6 +30,7 @@ struct Terminal {
     console_text: String,
     serial_settings_flag: bool,
     serial_port: Option<Box<dyn SerialPort>>,
+    port_connected: bool,
 }
 
 impl Default for Terminal {
@@ -43,6 +44,7 @@ impl Default for Terminal {
             console_text: "".to_owned(),
             serial_settings_flag: false,
             serial_port: None,
+            port_connected: false,
         }
     }
 }
@@ -124,18 +126,28 @@ impl eframe::epi::App for Terminal {
                         }
                     }
                 );
-                if ui.button("Connect").clicked() {
-                    match &self.selected_comport {
-                        ComPort::None => println!("Select a valid Comport!!!!"),
-                        ComPort::COMPORT(port_name) => {
-                            if let Ok(port) = serialport::new(port_name, 115200).timeout(Duration::from_millis(100)).open() {
-                                self.serial_port = Some(port);
-                                println!("Opened the Serial Port!");
-                            }
-                            else {
-                                println!("Can't open port");
-                            }
-                        },
+                if self.port_connected {
+                    if ui.button("Disconnect").clicked() {
+                        self.serial_port = None;
+                        self.port_connected = false;
+                        println!("Disconnected Port");
+                    }
+                } 
+                else {
+                    if ui.button("Connect").clicked() {
+                        match &self.selected_comport {
+                            ComPort::None => println!("Select a valid Comport!!!!"),
+                            ComPort::COMPORT(port_name) => {
+                                if let Ok(port) = serialport::new(port_name, 115200).timeout(Duration::from_millis(100)).open() {
+                                    self.serial_port = Some(port);
+                                    self.port_connected = true;
+                                    println!("Opened the Serial Port!");
+                                }
+                                else {
+                                    println!("Can't open port");
+                                }
+                            },
+                        }
                     }
                 }
                 if ui.button("Settings").clicked() {
