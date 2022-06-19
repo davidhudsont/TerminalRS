@@ -21,18 +21,12 @@ enum ComPort
     COMPORT(String),
 }
 
-#[derive(Debug, PartialEq)]
-enum BuadRates {
-    None,
-    BAUD(i32)
-}
-
 struct Terminal {
     name: String,
     selected_comport: ComPort,
     comports: Vec<ComPort>,
-    selected_buadrate: BuadRates,
-    buadrates: Vec<BuadRates>,
+    selected_buadrate: u32,
+    buadrates: Vec<u32>,
     console_text: String,
     serial_settings_flag: bool,
     serial_port: Option<Box<dyn SerialPort>>,
@@ -44,8 +38,8 @@ impl Default for Terminal {
             name: "651R2/A Firmware Upgrade Application".to_owned(),
             selected_comport: ComPort::None,
             comports: vec![],
-            selected_buadrate: BuadRates::None,
-            buadrates: vec![BuadRates::BAUD(9600), BuadRates::BAUD(115200)],
+            selected_buadrate: 9600,
+            buadrates: vec![9600, 115200],
             console_text: "".to_owned(),
             serial_settings_flag: false,
             serial_port: None,
@@ -126,10 +120,7 @@ impl eframe::epi::App for Terminal {
                 .selected_text(format!("{:?}", self.selected_buadrate))
                 .show_ui(ui, |ui| {
                         for baudrate in &self.buadrates {
-                            match baudrate {
-                                BuadRates::BAUD(rate) => ui.selectable_value(&mut self.selected_buadrate, BuadRates::BAUD(*rate), rate.to_string()),
-                                BuadRates::None => ui.selectable_value(&mut self.selected_buadrate, BuadRates::None, ""),
-                            };
+                            ui.selectable_value(&mut self.selected_buadrate, *baudrate, baudrate.to_string());
                         }
                     }
                 );
@@ -158,7 +149,9 @@ impl eframe::epi::App for Terminal {
                             egui::ComboBox::from_id_source("BAUD")
                             .selected_text(format!("{:?}", self.selected_buadrate))
                             .show_ui(ui, |ui| {
-                                    ui.selectable_value(&mut self.selected_buadrate, BuadRates::None, "");
+                                    for baudrate in &self.buadrates {
+                                        ui.selectable_value(&mut self.selected_buadrate, *baudrate, baudrate.to_string());
+                                    }
                                 }
                             );
                         });
