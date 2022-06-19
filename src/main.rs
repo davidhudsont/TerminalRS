@@ -213,14 +213,7 @@ impl eframe::epi::App for MyApp {
                                 // Newlines are handled by `Key::Enter`.
                                 if !text_to_insert.is_empty() && text_to_insert != "\n" && text_to_insert != "\r" {
                                     self.serial_port.as_mut().unwrap().write(text_to_insert.as_bytes()).unwrap();
-                                    let mut read_buffer: Vec<u8> = vec![0; 1];
-                                    match self.serial_port.as_mut().unwrap().read(&mut read_buffer[..]) {
-                                        Err(err) => println!("Got an IO Error: {err}"),
-                                        Ok(bytes) => println!("Bytes read: {bytes}"),
-                                    }
-                                    self.console_text.push_str(std::str::from_utf8(&read_buffer).unwrap());
-                                } else {
-                                }
+                                } 
                             }
                             Event::Key {
                                 key: Key::Enter,
@@ -228,15 +221,24 @@ impl eframe::epi::App for MyApp {
                                 ..
                             } => {
                                 self.serial_port.as_mut().unwrap().write("\r\n".as_bytes()).unwrap();
-                                let mut read_buffer: Vec<u8> = vec![0; 1];
-                                match self.serial_port.as_mut().unwrap().read(&mut read_buffer[..]) {
-                                    Err(err) => println!("Got an IO Error: {err}"),
-                                    Ok(bytes) => println!("Bytes read: {bytes}"),
-                                }
-                                self.console_text.push_str(std::str::from_utf8(&read_buffer).unwrap());
                             }
                             _ => (),
                         };
+                    }
+                    let mut read_buffer: Vec<u8> = vec![0; 1];
+                    match self.serial_port.as_mut() {
+                        Some(port) => {
+                            match port.read(&mut read_buffer[..]) {
+                                Err(_) => (),
+                                Ok(bytes) => {
+                                    println!("Bytes read: {bytes}");
+                                    if bytes > 0 {
+                                        self.console_text.push_str(std::str::from_utf8(&read_buffer).unwrap());
+                                    }
+                                }
+                            }
+                        }
+                        None => (),
                     }
                 }
             });
