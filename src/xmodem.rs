@@ -1,14 +1,11 @@
-
 use serialport::SerialPort;
 use std::io::{Read, Write};
 
-
-pub struct XModem
-{
+pub struct XModem {
     /// Maximum retries
     retries: i32,
     /// Padding bytes
-    padbyte: u8
+    padbyte: u8,
 }
 
 const SOH: u8 = 0x01;
@@ -20,11 +17,8 @@ const CAN: u8 = 0x18;
 const SUB: u8 = 0x1A;
 const CRC: u8 = 0x43;
 
-
-impl XModem
-{
-    pub fn new() -> Self
-    {
+impl XModem {
+    pub fn new() -> Self {
         Self {
             retries: 16,
             padbyte: SUB,
@@ -57,18 +51,22 @@ impl XModem
     }
 
     /// Receives to a stream on the XModem protocol
-    pub fn receive(&mut self, device: &mut Box<dyn SerialPort>, mut stream: Box<dyn Write>, crc_mode: bool) -> Result<usize, &'static str> {
+    pub fn receive(
+        &mut self,
+        device: &mut Box<dyn SerialPort>,
+        mut stream: Box<dyn Write>,
+        crc_mode: bool,
+    ) -> Result<usize, &'static str> {
         let mut errors = 0;
         let mut size = 0;
         let mut cancel = false;
         // Synchronization
-        let buf = if crc_mode {vec![CRC]}  else { vec![NAK]};
+        let buf = if crc_mode { vec![CRC] } else { vec![NAK] };
         device.write(&buf[..]).expect("Sync I/O failure");
         // Receive Packets
         let mut data_length: usize = 128;
         let mut packet_num: u8 = 1;
         loop {
-
             // Read Header
             match self.read_byte(device) {
                 Ok(header) => {
@@ -77,10 +75,9 @@ impl XModem
                         SOH => data_length = 128,
                         STX => data_length = 1024,
                         EOT => break,
-                        CAN => 
-                        {
+                        CAN => {
                             if cancel {
-                                return Err("Cancelled got CAN Twice")
+                                return Err("Cancelled got CAN Twice");
                             }
                             cancel = true;
                             continue;
@@ -89,7 +86,9 @@ impl XModem
                             device.write(&buf[..]).expect("Sync I/O failure");
                             errors += 1;
                             if errors > self.retries {
-                                return Err("Synchronization failed, reached max number of retries");
+                                return Err(
+                                    "Synchronization failed, reached max number of retries",
+                                );
                             }
                             continue;
                         }
@@ -105,7 +104,11 @@ impl XModem
             }
 
             // Read rest of packet.
-            let packet_length = if crc_mode { data_length + 4 } else { data_length + 3};
+            let packet_length = if crc_mode {
+                data_length + 4
+            } else {
+                data_length + 3
+            };
             let mut packet = vec![0; packet_length];
             match device.read(&mut packet) {
                 Ok(_) => {
@@ -118,8 +121,7 @@ impl XModem
                         errors += 1;
                         self.send_byte(device, NAK);
                         continue;
-                    }
-                    else if pn1 != packet_num {
+                    } else if pn1 != packet_num {
                         println!("Error Packet Number was not expected");
                         errors += 1;
                         self.send_byte(device, NAK);
@@ -131,20 +133,21 @@ impl XModem
 
                     if crc_mode {
                         let calc_crc = crc(&packet[2..packet_length - 2]);
-                        let received_crc = ((packet[packet_length - 2] as u16) << 8) | packet[packet_length - 1] as u16;
-                        if received_crc != calc_crc
-                        {
+                        let received_crc = ((packet[packet_length - 2] as u16) << 8)
+                            | packet[packet_length - 1] as u16;
+                        if received_crc != calc_crc {
                             println!("CRC error: theirs {received_crc}, ours {calc_crc}");
                             errors += 1;
                             self.send_byte(device, NAK);
                             continue;
                         }
-                    }
-                    else {
+                    } else {
                         let calc_checksum = checksum(&packet[2..packet_length - 1]);
                         let received_checksum = packet[packet_length - 1];
                         if calc_checksum != received_checksum {
-                            println!("Check sum error: theirs {received_checksum}, ours {calc_checksum}");
+                            println!(
+                                "Check sum error: theirs {received_checksum}, ours {calc_checksum}"
+                            );
                             errors += 1;
                             self.send_byte(device, NAK);
                             continue;
@@ -152,16 +155,17 @@ impl XModem
                     }
 
                     size += data_length;
-                    stream.as_mut().write(&packet[2..packet_length - 1]).expect("Failed to write to stream");
+                    stream
+                        .as_mut()
+                        .write(&packet[2..packet_length - 1])
+                        .expect("Failed to write to stream");
                     println!("Send ACK");
                     self.send_byte(device, ACK);
                     if packet_num == 255 {
                         packet_num = 0;
-                    }
-                    else {
+                    } else {
                         packet_num += 1;
                     }
-
                 }
                 _ => {
                     errors += 1;
@@ -177,7 +181,11 @@ impl XModem
     }
 
     /// Sends a stream over the XModem protocol
-    pub fn send(&mut self, device: &mut Box<dyn SerialPort>, mut stream: Box<dyn Read>) -> Result<(), &'static str> {
+    pub fn send(
+        &mut self,
+        device: &mut Box<dyn SerialPort>,
+        mut stream: Box<dyn Read>,
+    ) -> Result<(), &'static str> {
         let mut errors = 0;
 
         let mut cancel = false;
@@ -194,10 +202,9 @@ impl XModem
                             crc_mode = true;
                             break;
                         }
-                        CAN => 
-                        {
+                        CAN => {
                             if cancel {
-                                return Err("Cancelled got CAN Twice")
+                                return Err("Cancelled got CAN Twice");
                             }
                             cancel = true;
                         }
@@ -205,7 +212,9 @@ impl XModem
                         _ => {
                             errors += 1;
                             if errors > self.retries {
-                                return Err("Synchronization failed, reached max number of retries");
+                                return Err(
+                                    "Synchronization failed, reached max number of retries",
+                                );
                             }
                         }
                     }
@@ -224,7 +233,9 @@ impl XModem
         errors = 0;
         let packet_length: usize = 128;
         let mut packet_num: u8 = 1;
-        device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+        device
+            .clear(serialport::ClearBuffer::Input)
+            .expect("Failed to clear buffer");
         loop {
             let mut data: Vec<u8> = vec![self.padbyte; packet_length];
             match stream.as_mut().read(&mut data) {
@@ -252,49 +263,53 @@ impl XModem
                             println!("CRC: {}", crc);
                             packet.push(hi_crc_byte);
                             packet.push(lo_crc_byte);
-                        }
-                        else {
+                        } else {
                             let checksum = checksum(&data);
                             println!("Checksum: {}", checksum);
                             packet.push(checksum);
                         }
                         device.write(&packet[..]).expect("Failed to Send Bytes");
                         println!("Packet to send: {:?}", packet);
-                        device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+                        device
+                            .clear(serialport::ClearBuffer::Input)
+                            .expect("Failed to clear buffer");
                         assert!(device.bytes_to_read().unwrap() == 0);
                         // Get Receiver ACK
                         match self.read_byte(device) {
-                            Ok(byte) => {
-                                match byte {
-                                    ACK => {
-                                        if packet_num == 255 {
-                                            packet_num = 0;
-                                        }
-                                        else {
-                                            packet_num += 1;
-                                        }
-                                        break;
+                            Ok(byte) => match byte {
+                                ACK => {
+                                    if packet_num == 255 {
+                                        packet_num = 0;
+                                    } else {
+                                        packet_num += 1;
                                     }
-                                    NAK => {
-                                        errors += 1;
-                                        println!("Received NAK resending");
-                                        if errors > self.retries {
-                                            return Err("Packet Send Failed, reached max number of retries");
-                                        }
-                                    }
-                                    _ => {
-                                        errors += 1;
-                                        if errors > self.retries {
-                                            return Err("Packet Send Failed, reached max number of retries");
-                                        }
+                                    break;
+                                }
+                                NAK => {
+                                    errors += 1;
+                                    println!("Received NAK resending");
+                                    if errors > self.retries {
+                                        return Err(
+                                            "Packet Send Failed, reached max number of retries",
+                                        );
                                     }
                                 }
-                            }
+                                _ => {
+                                    errors += 1;
+                                    if errors > self.retries {
+                                        return Err(
+                                            "Packet Send Failed, reached max number of retries",
+                                        );
+                                    }
+                                }
+                            },
                             Err(err) => {
                                 errors += 1;
                                 println!("Error Count: {errors}, Error: {err}");
                                 if errors > self.retries {
-                                    return Err("Packet Send Failed, reached max number of retries");
+                                    return Err(
+                                        "Packet Send Failed, reached max number of retries",
+                                    );
                                 }
                             }
                         }
@@ -303,16 +318,18 @@ impl XModem
                 _ => {
                     return Err("IO Read Error");
                 }
-            } 
+            }
         }
 
         // End of Transmission Sync
         loop {
-            device.clear(serialport::ClearBuffer::Input).expect("Failed to clear buffer");
+            device
+                .clear(serialport::ClearBuffer::Input)
+                .expect("Failed to clear buffer");
             assert!(device.bytes_to_read().unwrap() == 0);
             self.send_byte(device, EOT);
             let mut bytes = [0; 1];
-            match  device.read_exact(&mut bytes) {
+            match device.read_exact(&mut bytes) {
                 Ok(_) => {
                     let byte = bytes[0];
                     println!("End Sync Received Byte: {}, Errors: {}", byte, errors);
@@ -321,7 +338,9 @@ impl XModem
                         _ => {
                             errors += 1;
                             if errors > self.retries {
-                                return Err("End of Transmission Sync, reached max number of retries");
+                                return Err(
+                                    "End of Transmission Sync, reached max number of retries",
+                                );
                             }
                         }
                     }
@@ -331,18 +350,13 @@ impl XModem
         }
         Ok(())
     }
-
-
-
-
-
 }
 
 /// Calculates 8bit XModem checksum
 fn checksum(data: &[u8]) -> u8 {
     let sum: u32 = data.iter().map(|&val| val as u32).sum();
     let checksum = (sum % 256) as u8;
-    return checksum; 
+    return checksum;
 }
 
 /// Calculate 16bit XModem CRC
@@ -358,15 +372,12 @@ fn crc(data: &[u8]) -> u16 {
             }
         }
     }
-    return crc as u16; 
+    return crc as u16;
 }
 
-
 #[cfg(test)]
-
 #[test]
-fn test_crc()
-{
+fn test_crc() {
     let data: Vec<u8> = vec![0x12, 0x34, 0x56, 0x78, 0x09];
     let result = crc(&data);
     assert_eq!(result, 0x5A76);
