@@ -1,42 +1,18 @@
-use serialport::{DataBits, StopBits};
-
 mod xmodem;
 
 use xmodem::XModem;
-
 use std::fs::File;
-
 use std::time::Duration;
-
-use eframe::egui::{self, Response, Event, Key};
+use eframe::{egui::{self, Response, Event, Key}, emath::Align};
 use serialport::SerialPort;
 
 fn main() {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        Box::new(MyApp::default()),
+        Box::new(Terminal::default()),
         options,
     );
 }
-
-// fn main() {
-//     let builder = serialport::new("COM11", 115200)
-//         .data_bits(DataBits::Eight)
-//         .stop_bits(StopBits::One);
-
-//     let mut port = builder.open().expect("Failed to open port");
-//     port.set_timeout(Duration::new(1, 0)).unwrap();
-
-//     let mut xmodem: XModem = XModem::new();
-
-//     let stream = File::open("example.txt").unwrap();
-//     xmodem.send(&mut port, Box::new(stream)).unwrap();
-
-//     // let stream = File::create("example2.txt").unwrap();
-//     // xmodem.receive(Box::new(stream), true).unwrap();
-
-// }
-
 
 #[derive(Debug, PartialEq)]
 enum ComPort
@@ -51,7 +27,7 @@ enum BuadRates {
     BAUD(i32)
 }
 
-struct MyApp {
+struct Terminal {
     name: String,
     selected_comport: ComPort,
     comports: Vec<ComPort>,
@@ -62,7 +38,7 @@ struct MyApp {
     serial_port: Option<Box<dyn SerialPort>>,
 }
 
-impl Default for MyApp {
+impl Default for Terminal {
     fn default() -> Self {
         Self {
             name: "651R2/A Firmware Upgrade Application".to_owned(),
@@ -81,7 +57,7 @@ fn selectable_text(ui: &mut egui::Ui, mut text: &str) -> Response {
     ui.add(egui::TextEdit::multiline(&mut text).desired_width(1000.0).desired_rows(25))
 }
 
-impl eframe::epi::App for MyApp {
+impl eframe::epi::App for Terminal {
     fn setup(&mut self, _ctx: &egui::Context, _frame: &eframe::epi::Frame, _storage: Option<&dyn eframe::epi::Storage>) {
         let serial_ports = serialport::available_ports().unwrap();
         self.comports = serial_ports.iter().map(|port| ComPort::COMPORT(port.port_name.clone())).collect();
@@ -189,21 +165,7 @@ impl eframe::epi::App for MyApp {
                     });
                 }
             });
-            if ui.button("Get ID").clicked() {
-                let buf = "ID\n\r".as_bytes();
-                match self.serial_port {
-                    Some(_) => self.serial_port.as_mut().unwrap().write(buf).unwrap(),
-                    None => 0,
-                };
-
-                let mut read_buffer: Vec<u8> = vec![0; 1000];
-                match self.serial_port.as_mut().unwrap().read(&mut read_buffer[..]) {
-                    Err(_) => println!("Got an IO Error"),
-                    Ok(bytes) => println!("Bytes read: {bytes}"),
-                }
-                self.console_text = std::str::from_utf8(&read_buffer).unwrap().to_string();
-            }
-
+            ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {
                 if selectable_text(ui, &mut self.console_text).has_focus() {
                     let events = ui.input().events.clone(); // avoid dead-lock by cloning. TODO: optimize
@@ -212,7 +174,13 @@ impl eframe::epi::App for MyApp {
                             Event::Text(text_to_insert) => {
                                 // Newlines are handled by `Key::Enter`.
                                 if !text_to_insert.is_empty() && text_to_insert != "\n" && text_to_insert != "\r" {
-                                    self.serial_port.as_mut().unwrap().write(text_to_insert.as_bytes()).unwrap();
+                                    match self.serial_port.as_mut() {
+                                        Some(port) => {
+                                            port.write(text_to_insert.as_bytes()).unwrap();
+                                        },
+                                        None => (),
+                                    }
+                                    ui.scroll_to_cursor(Some(Align::BOTTOM));
                                 } 
                             }
                             Event::Key {
@@ -220,7 +188,13 @@ impl eframe::epi::App for MyApp {
                                 pressed: true,
                                 ..
                             } => {
-                                self.serial_port.as_mut().unwrap().write("\r\n".as_bytes()).unwrap();
+                                match self.serial_port.as_mut() {
+                                    Some(port) => {
+                                        port.write("\r\n".as_bytes()).unwrap();
+                                    },
+                                    None => (),
+                                }
+                                ui.scroll_to_cursor(Some(Align::BOTTOM));
                             }
                             _ => (),
                         };
@@ -242,6 +216,8 @@ impl eframe::epi::App for MyApp {
                     }
                 }
             });
+            ui.separator();
+
         });
         ctx.request_repaint();
     }
