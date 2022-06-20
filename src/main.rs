@@ -52,7 +52,6 @@ struct Terminal {
     name: String,
     selected_comport: ComPort,
     comports: Vec<ComPort>,
-    selected_buadrate: u32,
     buadrates: Vec<u32>,
     console_text: String,
     serial_settings_flag: bool,
@@ -67,7 +66,6 @@ impl Default for Terminal {
             name: "651R2/A Firmware Upgrade Application".to_owned(),
             selected_comport: ComPort::None,
             comports: vec![],
-            selected_buadrate: 9600,
             buadrates: vec![9600, 115200],
             console_text: "".to_owned(),
             serial_settings_flag: false,
@@ -168,11 +166,11 @@ impl eframe::epi::App for Terminal {
                 }
                 ui.label("BAUD:");
                 egui::ComboBox::from_id_source("BAUD")
-                    .selected_text(format!("{:?}", self.selected_buadrate))
+                    .selected_text(format!("{:?}", self.port_settings.baud_rate))
                     .show_ui(ui, |ui| {
                         for baudrate in &self.buadrates {
                             ui.selectable_value(
-                                &mut self.selected_buadrate,
+                                &mut self.port_settings.baud_rate,
                                 *baudrate,
                                 baudrate.to_string(),
                             );
@@ -189,9 +187,14 @@ impl eframe::epi::App for Terminal {
                         match &self.selected_comport {
                             ComPort::None => println!("Select a valid Comport!!!!"),
                             ComPort::COMPORT(port_name) => {
-                                if let Ok(port) = serialport::new(port_name, 115200)
-                                    .timeout(Duration::from_millis(100))
-                                    .open()
+                                if let Ok(port) =
+                                    serialport::new(port_name, self.port_settings.baud_rate)
+                                        .data_bits(self.port_settings.data_bits)
+                                        .flow_control(self.port_settings.flow_control)
+                                        .parity(self.port_settings.parity)
+                                        .stop_bits(self.port_settings.stop_bits)
+                                        .timeout(self.port_settings.timeout)
+                                        .open()
                                 {
                                     self.serial_port = Some(port);
                                     self.port_connected = true;
@@ -215,17 +218,92 @@ impl eframe::epi::App for Terminal {
                             ui.label("Serial Parameters");
                             ui.horizontal(|ui| {
                                 ui.label("Data:");
-                                egui::ComboBox::from_id_source("BAUD")
-                                    .selected_text(format!("{:?}", self.selected_buadrate))
+                                egui::ComboBox::from_id_source("DataBit")
+                                    .selected_text(format!("{:?}", self.port_settings.data_bits))
                                     .show_ui(ui, |ui| {
-                                        for baudrate in &self.buadrates {
-                                            ui.selectable_value(
-                                                &mut self.selected_buadrate,
-                                                *baudrate,
-                                                baudrate.to_string(),
-                                            );
-                                        }
+                                        ui.selectable_value(
+                                            &mut self.port_settings.data_bits,
+                                            DataBits::Five,
+                                            "Five",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.data_bits,
+                                            DataBits::Six,
+                                            "Six",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.data_bits,
+                                            DataBits::Seven,
+                                            "Seven",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.data_bits,
+                                            DataBits::Eight,
+                                            "Eight",
+                                        );
                                     });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Flow Control:");
+                                egui::ComboBox::from_id_source("FlowControl")
+                                    .selected_text(format!("{:?}", self.port_settings.flow_control))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.port_settings.flow_control,
+                                            FlowControl::None,
+                                            "None",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.flow_control,
+                                            FlowControl::Software,
+                                            "Software",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.flow_control,
+                                            FlowControl::Hardware,
+                                            "Hardware",
+                                        );
+                                    })
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Parity:");
+                                egui::ComboBox::from_id_source("Parity")
+                                    .selected_text(format!("{:?}", self.port_settings.parity))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.port_settings.parity,
+                                            Parity::None,
+                                            "None",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.parity,
+                                            Parity::Odd,
+                                            "Odd",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.parity,
+                                            Parity::Even,
+                                            "Even",
+                                        );
+                                    })
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Stop Bits:");
+                                egui::ComboBox::from_id_source("StopBits")
+                                    .selected_text(format!("{:?}", self.port_settings.stop_bits))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.port_settings.stop_bits,
+                                            StopBits::One,
+                                            "One",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.port_settings.stop_bits,
+                                            StopBits::Two,
+                                            "Two",
+                                        );
+                                    })
                             });
                         });
                 }
