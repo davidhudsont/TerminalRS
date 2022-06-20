@@ -3,7 +3,6 @@ mod xmodem;
 use eframe::{
     egui::{self, Event, Key, Response},
     emath::Align,
-    epaint::Vec2,
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use std::fs::File;
