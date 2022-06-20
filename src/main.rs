@@ -42,16 +42,10 @@ impl SerialPortSettings {
     }
 }
 
-#[derive(Debug, PartialEq)]
-enum ComPort {
-    None,
-    COMPORT(String),
-}
-
 struct Terminal {
     name: String,
-    selected_comport: ComPort,
-    comports: Vec<ComPort>,
+    selected_comport: String,
+    comports: Vec<String>,
     buadrates: Vec<u32>,
     console_text: String,
     serial_settings_flag: bool,
@@ -64,7 +58,7 @@ impl Default for Terminal {
     fn default() -> Self {
         Self {
             name: "651R2/A Firmware Upgrade Application".to_owned(),
-            selected_comport: ComPort::None,
+            selected_comport: "".to_owned(),
             comports: vec![],
             buadrates: vec![9600, 115200],
             console_text: "".to_owned(),
@@ -94,7 +88,7 @@ impl eframe::epi::App for Terminal {
         let serial_ports = serialport::available_ports().unwrap();
         self.comports = serial_ports
             .iter()
-            .map(|port| ComPort::COMPORT(port.port_name.clone()))
+            .map(|port| port.port_name.clone())
             .collect();
         println!("Serial Ports {:?}", self.comports);
     }
@@ -139,28 +133,21 @@ impl eframe::epi::App for Terminal {
             ui.horizontal(|ui| {
                 ui.label("COMM:");
                 egui::ComboBox::from_id_source("COMPORT")
-                    .selected_text(format!("{:?}", self.selected_comport))
+                    .selected_text(format!("{}", self.selected_comport))
                     .show_ui(ui, |ui| {
                         for comport in &self.comports {
-                            match comport {
-                                ComPort::COMPORT(port) => ui.selectable_value(
-                                    &mut self.selected_comport,
-                                    ComPort::COMPORT(port.to_string()),
-                                    port.to_string(),
-                                ),
-                                ComPort::None => ui.selectable_value(
-                                    &mut self.selected_comport,
-                                    ComPort::None,
-                                    "",
-                                ),
-                            };
+                            ui.selectable_value(
+                                &mut self.selected_comport,
+                                comport.to_string(),
+                                comport,
+                            );
                         }
                     });
                 if ui.button("Refresh Ports").clicked() {
                     let serial_ports = serialport::available_ports().unwrap();
                     self.comports = serial_ports
                         .iter()
-                        .map(|port| ComPort::COMPORT(port.port_name.clone()))
+                        .map(|port| port.port_name.clone())
                         .collect();
                     println!("Serial Ports {:?}", self.comports);
                 }
@@ -184,24 +171,23 @@ impl eframe::epi::App for Terminal {
                     }
                 } else {
                     if ui.button("Connect").clicked() {
-                        match &self.selected_comport {
-                            ComPort::None => println!("Select a valid Comport!!!!"),
-                            ComPort::COMPORT(port_name) => {
-                                if let Ok(port) =
-                                    serialport::new(port_name, self.port_settings.baud_rate)
-                                        .data_bits(self.port_settings.data_bits)
-                                        .flow_control(self.port_settings.flow_control)
-                                        .parity(self.port_settings.parity)
-                                        .stop_bits(self.port_settings.stop_bits)
-                                        .timeout(self.port_settings.timeout)
-                                        .open()
-                                {
-                                    self.serial_port = Some(port);
-                                    self.port_connected = true;
-                                    println!("Opened the Serial Port!");
-                                } else {
-                                    println!("Can't open port");
-                                }
+                        if self.selected_comport.len() > 0 {
+                            if let Ok(port) = serialport::new(
+                                self.selected_comport.clone(),
+                                self.port_settings.baud_rate,
+                            )
+                            .data_bits(self.port_settings.data_bits)
+                            .flow_control(self.port_settings.flow_control)
+                            .parity(self.port_settings.parity)
+                            .stop_bits(self.port_settings.stop_bits)
+                            .timeout(self.port_settings.timeout)
+                            .open()
+                            {
+                                self.serial_port = Some(port);
+                                self.port_connected = true;
+                                println!("Opened the Serial Port!");
+                            } else {
+                                println!("Can't open port");
                             }
                         }
                     }
