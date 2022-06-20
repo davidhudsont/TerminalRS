@@ -60,7 +60,10 @@ impl Default for Terminal {
             name: "651R2/A Firmware Upgrade Application".to_owned(),
             selected_comport: "".to_owned(),
             comports: vec![],
-            buadrates: vec![9600, 115200],
+            buadrates: vec![
+                110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 230400,
+                460800, 921600,
+            ],
             console_text: "".to_owned(),
             serial_settings_flag: false,
             serial_port: None,
@@ -153,7 +156,7 @@ impl eframe::epi::App for Terminal {
                 }
                 ui.label("BAUD:");
                 egui::ComboBox::from_id_source("BAUD")
-                    .selected_text(format!("{:?}", self.port_settings.baud_rate))
+                    .selected_text(format!("{}", self.port_settings.baud_rate))
                     .show_ui(ui, |ui| {
                         for baudrate in &self.buadrates {
                             ui.selectable_value(

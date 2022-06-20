@@ -25,18 +25,6 @@ impl XModem {
         }
     }
 
-    /// Set the maximum number of retries
-    pub fn retries(mut self, retries: i32) -> Self {
-        self.retries = retries;
-        self
-    }
-
-    /// Set the padding bytes
-    pub fn padbyte(mut self, padbyte: u8) -> Self {
-        self.padbyte = padbyte;
-        self
-    }
-
     fn send_byte(&mut self, device: &mut Box<dyn SerialPort>, byte: u8) {
         let packet: Vec<u8> = vec![byte];
         device.write(&packet[..]).expect("Failed to send byte");
