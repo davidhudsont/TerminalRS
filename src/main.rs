@@ -95,7 +95,7 @@ impl Terminal {
     fn serial_settings_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("Serial Settings")
             .open(&mut self.serial_settings_flag)
-            .default_size(vec2(500.0, 500.0))
+            .default_size(vec2(200.0, 200.0))
             .collapsible(true)
             .show(ctx, |ui| {
                 ui.group(|ui| {
@@ -190,6 +190,8 @@ impl Terminal {
                             })
                     });
                 });
+                // This line allows for freely resizable windows
+                ui.allocate_space(ui.available_size());
             });
     }
 }
