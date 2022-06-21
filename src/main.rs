@@ -1,7 +1,7 @@
 mod xmodem;
 
 use eframe::{
-    egui::{self, Event, Key, Response},
+    egui::{self, Event, Key, Response, Ui},
     emath::Align,
     epaint::vec2,
 };
@@ -92,14 +92,50 @@ fn selectable_text(ui: &mut egui::Ui, mut text: &str) -> Response {
 }
 
 impl Terminal {
-    fn serial_settings_window(&mut self, ctx: &egui::Context) {
+    fn comport_setting_combo_box(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("COMM:");
+            egui::ComboBox::from_id_source("COMPORT")
+                .selected_text(format!("{}", self.selected_comport))
+                .show_ui(ui, |ui| {
+                    for comport in &self.comports {
+                        ui.selectable_value(
+                            &mut self.selected_comport,
+                            comport.to_string(),
+                            comport,
+                        );
+                    }
+                });
+        });
+    }
+
+    fn buadrate_setting_combo_box(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("BAUD:");
+            egui::ComboBox::from_id_source("BAUD")
+                .selected_text(format!("{}", self.port_settings.baud_rate))
+                .show_ui(ui, |ui| {
+                    for baudrate in &self.buadrates {
+                        ui.selectable_value(
+                            &mut self.port_settings.baud_rate,
+                            *baudrate,
+                            baudrate.to_string(),
+                        );
+                    }
+                });
+        });
+    }
+
+    fn serial_settings_window(&mut self, ctx: &egui::Context, open: &mut bool) {
         egui::Window::new("Serial Settings")
-            .open(&mut self.serial_settings_flag)
+            .open(open)
             .default_size(vec2(200.0, 200.0))
             .collapsible(true)
             .show(ctx, |ui| {
                 ui.group(|ui| {
                     ui.label("Serial Parameters");
+                    self.comport_setting_combo_box(ui);
+                    self.buadrate_setting_combo_box(ui);
                     ui.horizontal(|ui| {
                         ui.label("Data:");
                         egui::ComboBox::from_id_source("DataBit")
@@ -235,18 +271,7 @@ impl eframe::App for Terminal {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label("COMM:");
-                egui::ComboBox::from_id_source("COMPORT")
-                    .selected_text(format!("{}", self.selected_comport))
-                    .show_ui(ui, |ui| {
-                        for comport in &self.comports {
-                            ui.selectable_value(
-                                &mut self.selected_comport,
-                                comport.to_string(),
-                                comport,
-                            );
-                        }
-                    });
+                self.comport_setting_combo_box(ui);
                 if ui.button("Refresh Ports").clicked() {
                     let serial_ports = serialport::available_ports().unwrap();
                     self.comports = serial_ports
@@ -255,18 +280,7 @@ impl eframe::App for Terminal {
                         .collect();
                     println!("Serial Ports {:?}", self.comports);
                 }
-                ui.label("BAUD:");
-                egui::ComboBox::from_id_source("BAUD")
-                    .selected_text(format!("{}", self.port_settings.baud_rate))
-                    .show_ui(ui, |ui| {
-                        for baudrate in &self.buadrates {
-                            ui.selectable_value(
-                                &mut self.port_settings.baud_rate,
-                                *baudrate,
-                                baudrate.to_string(),
-                            );
-                        }
-                    });
+                self.buadrate_setting_combo_box(ui);
                 if self.port_connected {
                     if ui.button("Disconnect").clicked() {
                         self.serial_port = None;
@@ -355,7 +369,9 @@ impl eframe::App for Terminal {
             });
             ui.separator();
         });
-        self.serial_settings_window(ctx);
+        let mut open = self.serial_settings_flag;
+        self.serial_settings_window(ctx, &mut open);
+        self.serial_settings_flag = open;
         ctx.request_repaint();
     }
 }
