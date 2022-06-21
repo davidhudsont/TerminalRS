@@ -3,6 +3,7 @@ mod xmodem;
 use eframe::{
     egui::{self, Event, Key, Response},
     emath::Align,
+    epaint::vec2,
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use std::fs::File;
@@ -11,7 +12,11 @@ use xmodem::XModem;
 
 fn main() {
     let options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(Terminal::default()), options);
+    eframe::run_native(
+        "651R2/A Firmware Upgrade Application",
+        options,
+        Box::new(|cc| Box::new(Terminal::new(cc))),
+    );
 }
 
 struct SerialPortSettings {
@@ -43,7 +48,6 @@ impl SerialPortSettings {
 }
 
 struct Terminal {
-    name: String,
     selected_comport: String,
     comports: Vec<String>,
     buadrates: Vec<u32>,
@@ -54,12 +58,18 @@ struct Terminal {
     port_settings: SerialPortSettings,
 }
 
-impl Default for Terminal {
-    fn default() -> Self {
+impl Terminal {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let serial_ports = serialport::available_ports().unwrap();
+
+        cc.egui_ctx.set_visuals(egui::Visuals::dark());
+
         Self {
-            name: "651R2/A Firmware Upgrade Application".to_owned(),
             selected_comport: "".to_owned(),
-            comports: vec![],
+            comports: serial_ports
+                .iter()
+                .map(|port| port.port_name.clone())
+                .collect(),
             buadrates: vec![
                 110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 230400,
                 460800, 921600,
@@ -83,126 +93,109 @@ fn selectable_text(ui: &mut egui::Ui, mut text: &str) -> Response {
 
 impl Terminal {
     fn serial_settings_window(&mut self, ctx: &egui::Context) {
-        let window = egui::Window::new("Serial Settings")
+        egui::Window::new("Serial Settings")
             .open(&mut self.serial_settings_flag)
-            .resizable(true)
-            .min_width(800.0)
+            .default_size(vec2(500.0, 500.0))
             .collapsible(true)
-            .enabled(true);
+            .show(ctx, |ui| {
+                ui.group(|ui| {
+                    ui.label("Serial Parameters");
+                    ui.horizontal(|ui| {
+                        ui.label("Data:");
+                        egui::ComboBox::from_id_source("DataBit")
+                            .selected_text(format!("{:?}", self.port_settings.data_bits))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.port_settings.data_bits,
+                                    DataBits::Five,
+                                    "Five",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.data_bits,
+                                    DataBits::Six,
+                                    "Six",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.data_bits,
+                                    DataBits::Seven,
+                                    "Seven",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.data_bits,
+                                    DataBits::Eight,
+                                    "Eight",
+                                );
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Flow Control:");
+                        egui::ComboBox::from_id_source("FlowControl")
+                            .selected_text(format!("{:?}", self.port_settings.flow_control))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.port_settings.flow_control,
+                                    FlowControl::None,
+                                    "None",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.flow_control,
+                                    FlowControl::Software,
+                                    "Software",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.flow_control,
+                                    FlowControl::Hardware,
+                                    "Hardware",
+                                );
+                            })
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Parity:");
+                        egui::ComboBox::from_id_source("Parity")
+                            .selected_text(format!("{:?}", self.port_settings.parity))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.port_settings.parity,
+                                    Parity::None,
+                                    "None",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.parity,
+                                    Parity::Odd,
+                                    "Odd",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.parity,
+                                    Parity::Even,
+                                    "Even",
+                                );
+                            })
+                    });
 
-        window.show(ctx, |ui| {
-            ui.group(|ui| {
-                ui.label("Serial Parameters");
-                ui.horizontal(|ui| {
-                    ui.label("Data:");
-                    egui::ComboBox::from_id_source("DataBit")
-                        .selected_text(format!("{:?}", self.port_settings.data_bits))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.port_settings.data_bits,
-                                DataBits::Five,
-                                "Five",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.data_bits,
-                                DataBits::Six,
-                                "Six",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.data_bits,
-                                DataBits::Seven,
-                                "Seven",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.data_bits,
-                                DataBits::Eight,
-                                "Eight",
-                            );
-                        });
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Flow Control:");
-                    egui::ComboBox::from_id_source("FlowControl")
-                        .selected_text(format!("{:?}", self.port_settings.flow_control))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.port_settings.flow_control,
-                                FlowControl::None,
-                                "None",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.flow_control,
-                                FlowControl::Software,
-                                "Software",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.flow_control,
-                                FlowControl::Hardware,
-                                "Hardware",
-                            );
-                        })
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Parity:");
-                    egui::ComboBox::from_id_source("Parity")
-                        .selected_text(format!("{:?}", self.port_settings.parity))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.port_settings.parity,
-                                Parity::None,
-                                "None",
-                            );
-                            ui.selectable_value(&mut self.port_settings.parity, Parity::Odd, "Odd");
-                            ui.selectable_value(
-                                &mut self.port_settings.parity,
-                                Parity::Even,
-                                "Even",
-                            );
-                        })
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Stop Bits:");
-                    egui::ComboBox::from_id_source("StopBits")
-                        .selected_text(format!("{:?}", self.port_settings.stop_bits))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.port_settings.stop_bits,
-                                StopBits::One,
-                                "One",
-                            );
-                            ui.selectable_value(
-                                &mut self.port_settings.stop_bits,
-                                StopBits::Two,
-                                "Two",
-                            );
-                        })
+                    ui.horizontal(|ui| {
+                        ui.label("Stop Bits:");
+                        egui::ComboBox::from_id_source("StopBits")
+                            .selected_text(format!("{:?}", self.port_settings.stop_bits))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.port_settings.stop_bits,
+                                    StopBits::One,
+                                    "One",
+                                );
+                                ui.selectable_value(
+                                    &mut self.port_settings.stop_bits,
+                                    StopBits::Two,
+                                    "Two",
+                                );
+                            })
+                    });
                 });
             });
-        });
     }
 }
 
-impl eframe::epi::App for Terminal {
-    fn setup(
-        &mut self,
-        _ctx: &egui::Context,
-        _frame: &eframe::epi::Frame,
-        _storage: Option<&dyn eframe::epi::Storage>,
-    ) {
-        let serial_ports = serialport::available_ports().unwrap();
-        self.comports = serial_ports
-            .iter()
-            .map(|port| port.port_name.clone())
-            .collect();
-        println!("Serial Ports {:?}", self.comports);
-    }
-
-    fn update(&mut self, ctx: &egui::Context, _frame: &eframe::epi::Frame) {
-        if self.serial_settings_flag {
-            self.serial_settings_window(ctx);
-        }
-
+impl eframe::App for Terminal {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("Menu").show(ctx, |ui| {
             ui.menu_button("Transfer", |ui| {
                 if ui.button("xModem Send").clicked() {
@@ -360,10 +353,7 @@ impl eframe::epi::App for Terminal {
             });
             ui.separator();
         });
+        self.serial_settings_window(ctx);
         ctx.request_repaint();
-    }
-
-    fn name(&self) -> &str {
-        self.name.as_str()
     }
 }
