@@ -34,7 +34,7 @@ struct SerialPortSettings {
     timeout: Duration,
 }
 
-impl SerialPortSettings {
+impl Default for SerialPortSettings {
     fn default() -> Self {
         Self {
             baud_rate: 115200,
@@ -238,14 +238,10 @@ impl eframe::App for Terminal {
             ui.menu_button("Transfer", |ui| {
                 if ui.button("xModem Send").clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
-                        let picked_path = Some(path.display().to_string());
-                        println!("Picked path: {:?}", picked_path);
-
-                        let mut xmodem = XModem::new();
-                        let stream = File::open(picked_path.unwrap()).unwrap();
+                        let picked_path = path.display().to_string();
                         let port = self.serial_port.as_mut().unwrap();
-
-                        match xmodem.send(port, Box::new(stream)) {
+                        let stream = File::open(picked_path).unwrap();
+                        match XModem::new().send(port, Box::new(stream)) {
                             Ok(()) => println!("File Send success"),
                             Err(err) => println!("Error: {err}"),
                         }
@@ -253,14 +249,10 @@ impl eframe::App for Terminal {
                 }
                 if ui.button("xModem Receive").clicked() {
                     if let Some(path) = rfd::FileDialog::new().save_file() {
-                        let picked_path = Some(path.display().to_string());
-                        println!("Picked path: {:?}", picked_path);
-
-                        let mut xmodem = XModem::new();
-                        let stream = File::create(picked_path.unwrap()).unwrap();
+                        let picked_path = path.display().to_string();
                         let port = self.serial_port.as_mut().unwrap();
-
-                        match xmodem.receive(port, Box::new(stream), false) {
+                        let stream = File::create(picked_path).unwrap();
+                        match XModem::new().receive(port, Box::new(stream), false) {
                             Ok(bytes) => println!("File Receive success, Bytes: {bytes} read."),
                             Err(err) => println!("Error: {err}"),
                         }
