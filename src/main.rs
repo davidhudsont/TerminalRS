@@ -31,7 +31,7 @@ struct SerialPortSettings {
     /// Number of bits to use to signal the end of a character
     stop_bits: StopBits,
     /// Amount of time to wait to receive data before timing out
-    timeout: Duration,
+    timeout: u64,
 }
 
 impl Default for SerialPortSettings {
@@ -42,7 +42,7 @@ impl Default for SerialPortSettings {
             flow_control: FlowControl::None,
             parity: Parity::None,
             stop_bits: StopBits::One,
-            timeout: Duration::from_millis(10),
+            timeout: 10,
         }
     }
 }
@@ -141,6 +141,13 @@ impl Terminal {
         });
     }
 
+    fn timeout_setting_text_integer(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Timeout:");
+            ui.add(egui::DragValue::new(&mut self.port_settings.timeout));
+        });
+    }
+
     fn serial_settings_window(&mut self, ctx: &egui::Context, open: &mut bool) {
         egui::Window::new("Serial Settings")
             .open(open)
@@ -152,7 +159,7 @@ impl Terminal {
                     self.comport_setting_combo_box(ui);
                     self.buadrate_setting_combo_box(ui);
                     ui.horizontal(|ui| {
-                        ui.label("Data:");
+                        ui.label("DataBits:");
                         egui::ComboBox::from_id_source("DataBit")
                             .selected_text(format!("{:?}", self.port_settings.data_bits))
                             .show_ui(ui, |ui| {
@@ -240,6 +247,8 @@ impl Terminal {
                                 );
                             })
                     });
+
+                    self.timeout_setting_text_integer(ui);
                 });
                 // This line allows for freely resizable windows
                 ui.allocate_space(ui.available_size());
@@ -305,7 +314,7 @@ impl eframe::App for Terminal {
                             .flow_control(self.port_settings.flow_control)
                             .parity(self.port_settings.parity)
                             .stop_bits(self.port_settings.stop_bits)
-                            .timeout(self.port_settings.timeout)
+                            .timeout(Duration::from_millis(self.port_settings.timeout))
                             .open()
                             {
                                 self.serial_port = Some(port);
