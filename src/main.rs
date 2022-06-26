@@ -42,7 +42,7 @@ impl Default for SerialPortSettings {
             flow_control: FlowControl::None,
             parity: Parity::None,
             stop_bits: StopBits::One,
-            timeout: Duration::from_millis(100),
+            timeout: Duration::from_millis(10),
         }
     }
 }
@@ -56,6 +56,21 @@ struct Terminal {
     serial_port: Option<Box<dyn SerialPort>>,
     port_connected: bool,
     port_settings: SerialPortSettings,
+}
+
+fn read_byte(port: &mut Box<dyn SerialPort>) -> String {
+    let mut string: Vec<u8> = vec![];
+    let mut read_buffer: Vec<u8> = vec![0; 1];
+    loop {
+        match port.read(&mut read_buffer[..]) {
+            Err(_) => break,
+            Ok(_) => {
+                let byte = read_buffer[0];
+                string.push(byte);
+            }
+        }
+    }
+    std::str::from_utf8(&string).unwrap().to_string()
 }
 
 impl Terminal {
@@ -312,49 +327,38 @@ impl eframe::App for Terminal {
                     let events = ui.input().events.clone(); // avoid dead-lock by cloning. TODO: optimize
                     for event in &events {
                         match event {
-                            Event::Text(text_to_insert) => {
+                            Event::Text(text) => {
                                 // Newlines are handled by `Key::Enter`.
-                                if !text_to_insert.is_empty()
-                                    && text_to_insert != "\n"
-                                    && text_to_insert != "\r"
-                                {
+                                if !text.is_empty() && text != "\n" && text != "\r" {
                                     match self.serial_port.as_mut() {
                                         Some(port) => {
-                                            port.write(text_to_insert.as_bytes()).unwrap();
+                                            port.write(text.as_bytes()).unwrap();
                                         }
                                         None => (),
                                     }
-                                    ui.scroll_to_cursor(Some(Align::BOTTOM));
                                 }
                             }
                             Event::Key {
                                 key: Key::Enter,
                                 pressed: true,
                                 ..
-                            } => {
-                                match self.serial_port.as_mut() {
-                                    Some(port) => {
-                                        port.write("\r\n".as_bytes()).unwrap();
-                                    }
-                                    None => (),
+                            } => match self.serial_port.as_mut() {
+                                Some(port) => {
+                                    port.write("\r\n".as_bytes()).unwrap();
                                 }
-                                ui.scroll_to_cursor(Some(Align::BOTTOM));
-                            }
+                                None => (),
+                            },
                             _ => (),
                         };
                     }
-                    let mut read_buffer: Vec<u8> = vec![0; 1];
                     match self.serial_port.as_mut() {
-                        Some(port) => match port.read(&mut read_buffer[..]) {
-                            Err(_) => (),
-                            Ok(bytes) => {
-                                println!("Bytes read: {bytes}");
-                                if bytes > 0 {
-                                    self.console_text
-                                        .push_str(std::str::from_utf8(&read_buffer).unwrap());
-                                }
+                        Some(port) => {
+                            let result = read_byte(port);
+                            if result.len() > 0 {
+                                self.console_text.push_str(&result);
+                                ui.scroll_to_cursor(Some(Align::BOTTOM));
                             }
-                        },
+                        }
                         None => (),
                     }
                 }
