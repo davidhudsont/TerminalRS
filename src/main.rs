@@ -106,48 +106,40 @@ fn selectable_text(ui: &mut egui::Ui, mut text: &str) -> Response {
     )
 }
 
+fn comport_setting_combo_box(ui: &mut Ui, selected_comport: &mut String, comports: &Vec<String>) {
+    ui.horizontal(|ui| {
+        ui.label("COMM:");
+        egui::ComboBox::from_id_source("COMPORT")
+            .selected_text(format!("{}", selected_comport))
+            .show_ui(ui, |ui| {
+                for comport in comports {
+                    ui.selectable_value(selected_comport, comport.to_string(), comport);
+                }
+            });
+    });
+}
+
+fn buadrate_setting_combo_box(ui: &mut Ui, baud_rate: &mut u32, baud_rates: &Vec<u32>) {
+    ui.horizontal(|ui| {
+        ui.label("BAUD:");
+        egui::ComboBox::from_id_source("BAUD")
+            .selected_text(format!("{}", baud_rate))
+            .show_ui(ui, |ui| {
+                for rate in baud_rates {
+                    ui.selectable_value(baud_rate, *rate, rate.to_string());
+                }
+            });
+    });
+}
+
+fn timeout_setting_text_integer(ui: &mut Ui, timeout: &mut u64) {
+    ui.horizontal(|ui| {
+        ui.label("Timeout:");
+        ui.add(egui::DragValue::new(timeout));
+    });
+}
+
 impl Terminal {
-    fn comport_setting_combo_box(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label("COMM:");
-            egui::ComboBox::from_id_source("COMPORT")
-                .selected_text(format!("{}", self.selected_comport))
-                .show_ui(ui, |ui| {
-                    for comport in &self.comports {
-                        ui.selectable_value(
-                            &mut self.selected_comport,
-                            comport.to_string(),
-                            comport,
-                        );
-                    }
-                });
-        });
-    }
-
-    fn buadrate_setting_combo_box(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label("BAUD:");
-            egui::ComboBox::from_id_source("BAUD")
-                .selected_text(format!("{}", self.port_settings.baud_rate))
-                .show_ui(ui, |ui| {
-                    for baudrate in &self.buadrates {
-                        ui.selectable_value(
-                            &mut self.port_settings.baud_rate,
-                            *baudrate,
-                            baudrate.to_string(),
-                        );
-                    }
-                });
-        });
-    }
-
-    fn timeout_setting_text_integer(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label("Timeout:");
-            ui.add(egui::DragValue::new(&mut self.port_settings.timeout));
-        });
-    }
-
     fn serial_settings_window(&mut self, ctx: &egui::Context, open: &mut bool) {
         egui::Window::new("Serial Settings")
             .open(open)
@@ -156,8 +148,12 @@ impl Terminal {
             .show(ctx, |ui| {
                 ui.group(|ui| {
                     ui.label("Serial Parameters");
-                    self.comport_setting_combo_box(ui);
-                    self.buadrate_setting_combo_box(ui);
+                    comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
+                    buadrate_setting_combo_box(
+                        ui,
+                        &mut self.port_settings.baud_rate,
+                        &self.buadrates,
+                    );
                     ui.horizontal(|ui| {
                         ui.label("DataBits:");
                         egui::ComboBox::from_id_source("DataBit")
@@ -248,7 +244,7 @@ impl Terminal {
                             })
                     });
 
-                    self.timeout_setting_text_integer(ui);
+                    timeout_setting_text_integer(ui, &mut self.port_settings.timeout);
                 });
                 // This line allows for freely resizable windows
                 ui.allocate_space(ui.available_size());
@@ -287,7 +283,7 @@ impl eframe::App for Terminal {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                self.comport_setting_combo_box(ui);
+                comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
                 if ui.button("Refresh Ports").clicked() {
                     let serial_ports = serialport::available_ports().unwrap();
                     self.comports = serial_ports
@@ -296,7 +292,7 @@ impl eframe::App for Terminal {
                         .collect();
                     println!("Serial Ports {:?}", self.comports);
                 }
-                self.buadrate_setting_combo_box(ui);
+                buadrate_setting_combo_box(ui, &mut self.port_settings.baud_rate, &self.buadrates);
                 if self.port_connected {
                     if ui.button("Disconnect").clicked() {
                         self.serial_port = None;
