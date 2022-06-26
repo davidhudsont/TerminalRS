@@ -2,7 +2,7 @@ mod gui;
 mod xmodem;
 
 use eframe::{
-    egui::{self, Event, Key, Response, Ui},
+    egui::{self, Event, Key},
     emath::Align,
     epaint::vec2,
 };

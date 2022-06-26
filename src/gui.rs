@@ -1,5 +1,5 @@
 use eframe::egui::{self, Response, Ui};
-use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
+use serialport::{DataBits, FlowControl, Parity, StopBits};
 
 pub fn selectable_text(ui: &mut egui::Ui, mut text: &str) -> Response {
     ui.add(
