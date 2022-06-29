@@ -23,5 +23,8 @@ while True:
         if val == b'\n':
             print("send response")
             ser.write(response)
+        elif val == b'\r':
+            print("send response")
+            ser.write(response)
         else:
             ser.write(val)
