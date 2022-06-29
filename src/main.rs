@@ -4,10 +4,9 @@ mod xmodem;
 use eframe::{
     egui::{self, Event, Key},
     emath::Align,
-    epaint::vec2,
 };
 use gui::*;
-use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
+use serialport::SerialPort;
 use std::fs::File;
 use std::time::Duration;
 use xmodem::XModem;
@@ -19,34 +18,6 @@ fn main() {
         options,
         Box::new(|cc| Box::new(Terminal::new(cc))),
     );
-}
-
-struct SerialPortSettings {
-    /// The baud rate in symbols-per-second
-    baud_rate: u32,
-    /// Number of bits used to represent a character sent on the line
-    data_bits: DataBits,
-    /// The type of signalling to use for controlling data transfer
-    flow_control: FlowControl,
-    /// The type of parity to use for error checking
-    parity: Parity,
-    /// Number of bits to use to signal the end of a character
-    stop_bits: StopBits,
-    /// Amount of time to wait to receive data before timing out
-    timeout: u64,
-}
-
-impl Default for SerialPortSettings {
-    fn default() -> Self {
-        Self {
-            baud_rate: 115200,
-            data_bits: DataBits::Eight,
-            flow_control: FlowControl::None,
-            parity: Parity::None,
-            stop_bits: StopBits::One,
-            timeout: 10,
-        }
-    }
 }
 
 struct Terminal {
@@ -97,33 +68,6 @@ impl Terminal {
             port_connected: false,
             port_settings: SerialPortSettings::default(),
         }
-    }
-}
-
-impl Terminal {
-    fn serial_settings_window(&mut self, ctx: &egui::Context, open: &mut bool) {
-        egui::Window::new("Serial Settings")
-            .open(open)
-            .default_size(vec2(200.0, 200.0))
-            .collapsible(true)
-            .show(ctx, |ui| {
-                ui.group(|ui| {
-                    ui.label("Serial Parameters");
-                    comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
-                    buadrate_setting_combo_box(
-                        ui,
-                        &mut self.port_settings.baud_rate,
-                        &self.buadrates,
-                    );
-                    databits_setting_combo_box(ui, &mut self.port_settings.data_bits);
-                    flowcontrol_setting_combo_box(ui, &mut self.port_settings.flow_control);
-                    parity_setting_combo_box(ui, &mut self.port_settings.parity);
-                    stopbits_setting_combo_box(ui, &mut self.port_settings.stop_bits);
-                    timeout_setting_text_integer(ui, &mut self.port_settings.timeout);
-                });
-                // This line allows for freely resizable windows
-                ui.allocate_space(ui.available_size());
-            });
     }
 }
 
@@ -230,6 +174,7 @@ impl eframe::App for Terminal {
                             },
                             _ => (),
                         };
+                        ui.scroll_to_cursor(Some(Align::BOTTOM));
                     }
                     match self.serial_port.as_mut() {
                         Some(port) => {
@@ -245,9 +190,14 @@ impl eframe::App for Terminal {
             });
             ui.separator();
         });
-        let mut open = self.serial_settings_flag;
-        self.serial_settings_window(ctx, &mut open);
-        self.serial_settings_flag = open;
+        serial_settings_window(
+            ctx,
+            &mut self.selected_comport,
+            &self.comports,
+            &self.buadrates,
+            &mut self.port_settings,
+            &mut self.serial_settings_flag,
+        );
         ctx.request_repaint();
     }
 }
