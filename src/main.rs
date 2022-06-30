@@ -31,21 +31,6 @@ struct Terminal {
     port_settings: SerialPortSettings,
 }
 
-fn read_byte(port: &mut Box<dyn SerialPort>) -> String {
-    let mut string: Vec<u8> = vec![];
-    let mut read_buffer: Vec<u8> = vec![0; 1];
-    loop {
-        match port.read(&mut read_buffer[..]) {
-            Err(_) => break,
-            Ok(_) => {
-                let byte = read_buffer[0];
-                string.push(byte);
-            }
-        }
-    }
-    std::str::from_utf8(&string).unwrap().to_string()
-}
-
 impl Terminal {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let serial_ports = serialport::available_ports().unwrap();
@@ -146,48 +131,12 @@ impl eframe::App for Terminal {
                 }
             });
             ui.separator();
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                if selectable_text(ui, &mut self.console_text).has_focus() {
-                    let events = ui.input().events.clone(); // avoid dead-lock by cloning. TODO: optimize
-                    for event in &events {
-                        match event {
-                            Event::Text(text) => {
-                                // Newlines are handled by `Key::Enter`.
-                                if !text.is_empty() && text != "\n" && text != "\r" {
-                                    match self.serial_port.as_mut() {
-                                        Some(port) => {
-                                            port.write(text.as_bytes()).unwrap();
-                                        }
-                                        None => (),
-                                    }
-                                }
-                            }
-                            Event::Key {
-                                key: Key::Enter,
-                                pressed: true,
-                                ..
-                            } => match self.serial_port.as_mut() {
-                                Some(port) => {
-                                    port.write("\r\n".as_bytes()).unwrap();
-                                }
-                                None => (),
-                            },
-                            _ => (),
-                        };
-                        ui.scroll_to_cursor(Some(Align::BOTTOM));
-                    }
-                    match self.serial_port.as_mut() {
-                        Some(port) => {
-                            let result = read_byte(port);
-                            if result.len() > 0 {
-                                self.console_text.push_str(&result);
-                                ui.scroll_to_cursor(Some(Align::BOTTOM));
-                            }
-                        }
-                        None => (),
-                    }
+            match self.serial_port.as_mut() {
+                Some(serial_port) => {
+                    terminal(ui, &mut self.console_text, serial_port);
                 }
-            });
+                None => (),
+            }
             ui.separator();
         });
         serial_settings_window(

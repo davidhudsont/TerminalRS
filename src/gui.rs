@@ -1,5 +1,8 @@
-use eframe::egui::{self, epaint::vec2, Response, Ui};
-use serialport::{DataBits, FlowControl, Parity, StopBits};
+use eframe::{
+    egui::{self, epaint::vec2, Event, Key, Response, Ui},
+    emath::Align,
+};
+use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 
 pub struct SerialPortSettings {
     /// The baud rate in symbols-per-second
@@ -14,6 +17,21 @@ pub struct SerialPortSettings {
     pub stop_bits: StopBits,
     /// Amount of time to wait to receive data before timing out
     pub timeout: u64,
+}
+
+pub fn read_byte(port: &mut Box<dyn SerialPort>) -> String {
+    let mut string: Vec<u8> = vec![];
+    let mut read_buffer: Vec<u8> = vec![0; 1];
+    loop {
+        match port.read(&mut read_buffer[..]) {
+            Err(_) => break,
+            Ok(_) => {
+                let byte = read_buffer[0];
+                string.push(byte);
+            }
+        }
+    }
+    std::str::from_utf8(&string).unwrap().to_string()
 }
 
 impl Default for SerialPortSettings {
@@ -152,4 +170,36 @@ pub fn serial_settings_window(
             // This line allows for freely resizable windows
             ui.allocate_space(ui.available_size());
         });
+}
+
+pub fn terminal(ui: &mut Ui, console_text: &mut String, serial_port: &mut Box<dyn SerialPort>) {
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        if selectable_text(ui, console_text).has_focus() {
+            let events = ui.input().events.clone(); // avoid dead-lock by cloning. TODO: optimize
+            for event in &events {
+                match event {
+                    Event::Text(text) => {
+                        // Newlines are handled by `Key::Enter`.
+                        if !text.is_empty() && text != "\n" && text != "\r" {
+                            serial_port.write(text.as_bytes()).unwrap();
+                        }
+                    }
+                    Event::Key {
+                        key: Key::Enter,
+                        pressed: true,
+                        ..
+                    } => {
+                        serial_port.write("\r\n".as_bytes()).unwrap();
+                    }
+                    _ => (),
+                };
+                ui.scroll_to_cursor(Some(Align::BOTTOM));
+            }
+            let result = read_byte(serial_port);
+            if result.len() > 0 {
+                console_text.push_str(&result);
+                ui.scroll_to_cursor(Some(Align::BOTTOM));
+            }
+        }
+    });
 }
