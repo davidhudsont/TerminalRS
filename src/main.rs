@@ -24,6 +24,21 @@ struct Terminal {
     serial_settings_flag: bool,
     serial_port: Option<Box<dyn SerialPort>>,
     port_settings: SerialPortSettings,
+    sessions: Vec<Session>,
+}
+
+struct Session {
+    name: String,
+    checked: bool,
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            checked: Default::default(),
+        }
+    }
 }
 
 impl Terminal {
@@ -46,6 +61,7 @@ impl Terminal {
             serial_settings_flag: false,
             serial_port: None,
             port_settings: SerialPortSettings::default(),
+            sessions: vec![],
         }
     }
 }
@@ -87,12 +103,25 @@ impl eframe::App for Terminal {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let checked = true;
-            match tab(ui, "TERM1", checked) {
-                Action::Select => println!("Selected"),
-                Action::Delete => println!("Delete"),
-                Action::None => (),
-            }
+            ui.horizontal(|ui| {
+                for session in &mut self.sessions {
+                    match tab(ui, &session.name, session.checked) {
+                        Action::Select => {
+                            println!("Selected");
+                            session.checked = true;
+                        }
+                        Action::Delete => println!("Delete"),
+                        Action::None => (),
+                    }
+                }
+                if ui.button("+").clicked() {
+                    let len = self.sessions.len();
+                    self.sessions.push(Session {
+                        name: format!("TERM{}", len),
+                        checked: false,
+                    })
+                }
+            });
             ui.horizontal(|ui| {
                 comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
                 if ui.button("Refresh Ports").clicked() {

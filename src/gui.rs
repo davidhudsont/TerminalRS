@@ -154,14 +154,12 @@ pub enum Action {
 
 pub fn tab(ui: &mut Ui, name: impl Into<WidgetText>, checked: bool) -> Action {
     let mut action = Action::None;
-    ui.horizontal(|ui| {
-        ui.group(|ui| {
-            if ui.selectable_label(checked, name).clicked() {
-                action = Action::Select;
-            } else if ui.button("x").clicked() {
-                action = Action::Delete;
-            }
-        });
+    ui.group(|ui| {
+        if ui.selectable_label(checked, name).clicked() {
+            action = Action::Select;
+        } else if ui.button("x").clicked() {
+            action = Action::Delete;
+        }
     });
     action
 }
