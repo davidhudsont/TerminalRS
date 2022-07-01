@@ -87,6 +87,12 @@ impl eframe::App for Terminal {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            let checked = true;
+            match tab(ui, "TERM1", checked) {
+                Action::Select => println!("Selected"),
+                Action::Delete => println!("Delete"),
+                Action::None => (),
+            }
             ui.horizontal(|ui| {
                 comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
                 if ui.button("Refresh Ports").clicked() {

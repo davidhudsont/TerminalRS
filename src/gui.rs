@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use eframe::{
-    egui::{self, epaint::vec2, Event, Key, Response, Ui},
+    egui::{self, epaint::vec2, Event, Key, Response, Ui, WidgetText},
     emath::Align,
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
@@ -144,6 +144,26 @@ pub fn timeout_setting_text_integer(ui: &mut Ui, timeout: &mut u64) {
         ui.label("Timeout:");
         ui.add(egui::DragValue::new(timeout));
     });
+}
+
+pub enum Action {
+    Select,
+    Delete,
+    None,
+}
+
+pub fn tab(ui: &mut Ui, name: impl Into<WidgetText>, checked: bool) -> Action {
+    let mut action = Action::None;
+    ui.horizontal(|ui| {
+        ui.group(|ui| {
+            if ui.selectable_label(checked, name).clicked() {
+                action = Action::Select;
+            } else if ui.button("x").clicked() {
+                action = Action::Delete;
+            }
+        });
+    });
+    action
 }
 
 pub fn serial_settings(
