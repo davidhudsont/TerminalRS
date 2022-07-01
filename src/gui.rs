@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use eframe::{
     egui::{self, epaint::vec2, Event, Key, Response, Ui},
     emath::Align,
@@ -144,12 +146,57 @@ pub fn timeout_setting_text_integer(ui: &mut Ui, timeout: &mut u64) {
     });
 }
 
+pub fn serial_settings(
+    ui: &mut Ui,
+    selected_comport: &mut String,
+    comports: &Vec<String>,
+    baud_rates: &Vec<u32>,
+    port_settings: &mut SerialPortSettings,
+) {
+    ui.group(|ui| {
+        ui.label("Serial Parameters");
+        comport_setting_combo_box(ui, selected_comport, &comports);
+        buadrate_setting_combo_box(ui, &mut port_settings.baud_rate, &baud_rates);
+        databits_setting_combo_box(ui, &mut port_settings.data_bits);
+        flowcontrol_setting_combo_box(ui, &mut port_settings.flow_control);
+        parity_setting_combo_box(ui, &mut port_settings.parity);
+        stopbits_setting_combo_box(ui, &mut port_settings.stop_bits);
+        timeout_setting_text_integer(ui, &mut port_settings.timeout);
+    });
+}
+
+pub fn connected_button(
+    ui: &mut Ui,
+    selected_comport: &mut String,
+    port_settings: &mut SerialPortSettings,
+    serial_port: &mut Option<Box<dyn SerialPort>>,
+) {
+    if ui.button("Connect").clicked() {
+        if selected_comport.len() > 0 {
+            if let Ok(port) = serialport::new(selected_comport.clone(), port_settings.baud_rate)
+                .data_bits(port_settings.data_bits)
+                .flow_control(port_settings.flow_control)
+                .parity(port_settings.parity)
+                .stop_bits(port_settings.stop_bits)
+                .timeout(Duration::from_millis(port_settings.timeout))
+                .open()
+            {
+                println!("Opened the Serial Port!");
+                *serial_port = Some(port);
+            } else {
+                println!("Can't open port");
+            }
+        }
+    }
+}
+
 pub fn serial_settings_window(
     ctx: &egui::Context,
     selected_comport: &mut String,
     comports: &Vec<String>,
     baud_rates: &Vec<u32>,
     port_settings: &mut SerialPortSettings,
+    serial_port: &mut Option<Box<dyn SerialPort>>,
     open: &mut bool,
 ) {
     egui::Window::new("Serial Settings")
@@ -157,19 +204,16 @@ pub fn serial_settings_window(
         .default_size(vec2(200.0, 200.0))
         .collapsible(true)
         .show(ctx, |ui| {
-            ui.group(|ui| {
-                ui.label("Serial Parameters");
-                comport_setting_combo_box(ui, selected_comport, &comports);
-                buadrate_setting_combo_box(ui, &mut port_settings.baud_rate, &baud_rates);
-                databits_setting_combo_box(ui, &mut port_settings.data_bits);
-                flowcontrol_setting_combo_box(ui, &mut port_settings.flow_control);
-                parity_setting_combo_box(ui, &mut port_settings.parity);
-                stopbits_setting_combo_box(ui, &mut port_settings.stop_bits);
-                timeout_setting_text_integer(ui, &mut port_settings.timeout);
-            });
+            serial_settings(ui, selected_comport, comports, baud_rates, port_settings);
+            connected_button(ui, selected_comport, port_settings, serial_port);
             // This line allows for freely resizable windows
             ui.allocate_space(ui.available_size());
         });
+
+    match serial_port {
+        Some(_) => *open = false,
+        None => (),
+    }
 }
 
 pub fn terminal(ui: &mut Ui, console_text: &mut String, serial_port: &mut Box<dyn SerialPort>) {

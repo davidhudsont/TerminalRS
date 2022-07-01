@@ -5,7 +5,6 @@ use eframe::egui;
 use gui::*;
 use serialport::SerialPort;
 use std::fs::File;
-use std::time::Duration;
 use xmodem::XModem;
 
 fn main() {
@@ -24,7 +23,6 @@ struct Terminal {
     console_text: String,
     serial_settings_flag: bool,
     serial_port: Option<Box<dyn SerialPort>>,
-    port_connected: bool,
     port_settings: SerialPortSettings,
 }
 
@@ -47,7 +45,6 @@ impl Terminal {
             console_text: "".to_owned(),
             serial_settings_flag: false,
             serial_port: None,
-            port_connected: false,
             port_settings: SerialPortSettings::default(),
         }
     }
@@ -81,7 +78,11 @@ impl eframe::App for Terminal {
                         }
                     }
                 });
-                ui.menu_button("Sessions", |ui| if ui.button("New session").clicked() {});
+                ui.menu_button("Sessions", |ui| {
+                    if ui.button("New session").clicked() {
+                        self.serial_settings_flag = true;
+                    }
+                });
             });
         });
 
@@ -97,32 +98,19 @@ impl eframe::App for Terminal {
                     println!("Serial Ports {:?}", self.comports);
                 }
                 buadrate_setting_combo_box(ui, &mut self.port_settings.baud_rate, &self.buadrates);
-                if self.port_connected {
-                    if ui.button("Disconnect").clicked() {
-                        self.serial_port = None;
-                        self.port_connected = false;
-                        println!("Disconnected Port");
+                match self.serial_port {
+                    None => {
+                        connected_button(
+                            ui,
+                            &mut self.selected_comport,
+                            &mut self.port_settings,
+                            &mut self.serial_port,
+                        );
                     }
-                } else {
-                    if ui.button("Connect").clicked() {
-                        if self.selected_comport.len() > 0 {
-                            if let Ok(port) = serialport::new(
-                                self.selected_comport.clone(),
-                                self.port_settings.baud_rate,
-                            )
-                            .data_bits(self.port_settings.data_bits)
-                            .flow_control(self.port_settings.flow_control)
-                            .parity(self.port_settings.parity)
-                            .stop_bits(self.port_settings.stop_bits)
-                            .timeout(Duration::from_millis(self.port_settings.timeout))
-                            .open()
-                            {
-                                self.serial_port = Some(port);
-                                self.port_connected = true;
-                                println!("Opened the Serial Port!");
-                            } else {
-                                println!("Can't open port");
-                            }
+                    Some(_) => {
+                        if ui.button("Disconnect").clicked() {
+                            self.serial_port = None;
+                            println!("Disconnected Port");
                         }
                     }
                 }
@@ -145,6 +133,7 @@ impl eframe::App for Terminal {
             &self.comports,
             &self.buadrates,
             &mut self.port_settings,
+            &mut self.serial_port,
             &mut self.serial_settings_flag,
         );
         ctx.request_repaint();
