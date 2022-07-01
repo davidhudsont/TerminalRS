@@ -1,10 +1,7 @@
 mod gui;
 mod xmodem;
 
-use eframe::{
-    egui::{self, Event, Key},
-    emath::Align,
-};
+use eframe::egui;
 use gui::*;
 use serialport::SerialPort;
 use std::fs::File;
@@ -59,29 +56,32 @@ impl Terminal {
 impl eframe::App for Terminal {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("Menu").show(ctx, |ui| {
-            ui.menu_button("Transfer", |ui| {
-                if ui.button("xModem Send").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_file() {
-                        let picked_path = path.display().to_string();
-                        let port = self.serial_port.as_mut().unwrap();
-                        let stream = File::open(picked_path).unwrap();
-                        match XModem::new().send(port, Box::new(stream)) {
-                            Ok(()) => println!("File Send success"),
-                            Err(err) => println!("Error: {err}"),
+            ui.horizontal(|ui| {
+                ui.menu_button("Transfer", |ui| {
+                    if ui.button("xModem Send").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().pick_file() {
+                            let picked_path = path.display().to_string();
+                            let port = self.serial_port.as_mut().unwrap();
+                            let stream = File::open(picked_path).unwrap();
+                            match XModem::new().send(port, Box::new(stream)) {
+                                Ok(()) => println!("File Send success"),
+                                Err(err) => println!("Error: {err}"),
+                            }
                         }
                     }
-                }
-                if ui.button("xModem Receive").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().save_file() {
-                        let picked_path = path.display().to_string();
-                        let port = self.serial_port.as_mut().unwrap();
-                        let stream = File::create(picked_path).unwrap();
-                        match XModem::new().receive(port, Box::new(stream), false) {
-                            Ok(bytes) => println!("File Receive success, Bytes: {bytes} read."),
-                            Err(err) => println!("Error: {err}"),
+                    if ui.button("xModem Receive").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().save_file() {
+                            let picked_path = path.display().to_string();
+                            let port = self.serial_port.as_mut().unwrap();
+                            let stream = File::create(picked_path).unwrap();
+                            match XModem::new().receive(port, Box::new(stream), false) {
+                                Ok(bytes) => println!("File Receive success, Bytes: {bytes} read."),
+                                Err(err) => println!("Error: {err}"),
+                            }
                         }
                     }
-                }
+                });
+                ui.menu_button("Sessions", |ui| if ui.button("New session").clicked() {});
             });
         });
 
