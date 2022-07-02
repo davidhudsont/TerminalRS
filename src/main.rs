@@ -36,7 +36,6 @@ fn xmodem_recieve(picked_path: String, port: &mut Box<dyn SerialPort>) {
 
 struct Terminal {
     selected_comport: String,
-    buadrates: Vec<u32>,
     serial_settings_flag: bool,
     sessions: Vec<Session>,
     selected_session: usize,
@@ -48,10 +47,6 @@ impl Terminal {
 
         Self {
             selected_comport: "".to_owned(),
-            buadrates: vec![
-                110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 230400,
-                460800, 921600,
-            ],
             serial_settings_flag: false,
             sessions: vec![],
             selected_session: 0,
@@ -65,6 +60,7 @@ impl eframe::App for Terminal {
             ui.horizontal(|ui| {
                 ui.menu_button("Transfer", |ui| {
                     if ui.button("xModem Send").clicked() {
+                        ui.close_menu();
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             if self.sessions.len() > 0 {
                                 match self.sessions[self.selected_session].port.as_mut() {
@@ -80,6 +76,7 @@ impl eframe::App for Terminal {
                         }
                     }
                     if ui.button("xModem Receive").clicked() {
+                        ui.close_menu();
                         if let Some(path) = rfd::FileDialog::new().save_file() {
                             if self.sessions.len() > 0 {
                                 match self.sessions[self.selected_session].port.as_mut() {
@@ -98,6 +95,7 @@ impl eframe::App for Terminal {
                 ui.menu_button("Sessions", |ui| {
                     if ui.button("New session").clicked() {
                         self.serial_settings_flag = true;
+                        ui.close_menu();
                     }
                 });
             });
@@ -134,7 +132,6 @@ impl eframe::App for Terminal {
             match new_session_window(
                 ctx,
                 &mut self.selected_comport,
-                &self.buadrates,
                 &mut self.serial_settings_flag,
             ) {
                 Some(session) => {

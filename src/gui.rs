@@ -103,14 +103,19 @@ pub fn comport_setting_combo_box(
     });
 }
 
-pub fn buadrate_setting_combo_box(ui: &mut Ui, baud_rate: &mut u32, baud_rates: &Vec<u32>) {
+pub fn buadrate_setting_combo_box(ui: &mut Ui, baud_rate: &mut u32) {
+    let baud_rates: Vec<u32> = vec![
+        110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 230400, 460800,
+        921600,
+    ];
+
     ui.horizontal(|ui| {
         ui.label("BAUD:");
         egui::ComboBox::from_id_source("BAUD")
             .selected_text(format!("{}", baud_rate))
             .show_ui(ui, |ui| {
                 for rate in baud_rates {
-                    ui.selectable_value(baud_rate, *rate, rate.to_string());
+                    ui.selectable_value(baud_rate, rate, rate.to_string());
                 }
             });
     });
@@ -196,7 +201,6 @@ pub fn tab(ui: &mut Ui, name: impl Into<WidgetText>, checked: bool) -> Action {
 pub fn serial_settings(
     ui: &mut Ui,
     selected_comport: &mut String,
-    baud_rates: &Vec<u32>,
     port_settings: &mut SerialPortSettings,
 ) {
     ui.group(|ui| {
@@ -207,7 +211,7 @@ pub fn serial_settings(
             .map(|port| port.port_name.clone())
             .collect();
         comport_setting_combo_box(ui, selected_comport, &serial_ports);
-        buadrate_setting_combo_box(ui, &mut port_settings.baud_rate, &baud_rates);
+        buadrate_setting_combo_box(ui, &mut port_settings.baud_rate);
         databits_setting_combo_box(ui, &mut port_settings.data_bits);
         flowcontrol_setting_combo_box(ui, &mut port_settings.flow_control);
         parity_setting_combo_box(ui, &mut port_settings.parity);
@@ -244,7 +248,6 @@ pub fn connected_button(
 pub fn new_session_window(
     ctx: &egui::Context,
     selected_comport: &mut String,
-    baud_rates: &Vec<u32>,
     open: &mut bool,
 ) -> Option<Session> {
     let mut result = None;
@@ -254,7 +257,7 @@ pub fn new_session_window(
         .open(open)
         .default_size(vec2(200.0, 200.0))
         .show(ctx, |ui| {
-            serial_settings(ui, selected_comport, baud_rates, &mut port_settings);
+            serial_settings(ui, selected_comport, &mut port_settings);
             ui.add_space(20.0);
             ui.vertical_centered(|ui| {
                 connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
