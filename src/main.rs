@@ -36,7 +36,6 @@ fn xmodem_recieve(picked_path: String, port: &mut Box<dyn SerialPort>) {
 
 struct Terminal {
     selected_comport: String,
-    comports: Vec<String>,
     buadrates: Vec<u32>,
     serial_settings_flag: bool,
     sessions: Vec<Session>,
@@ -45,16 +44,10 @@ struct Terminal {
 
 impl Terminal {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let serial_ports = serialport::available_ports().unwrap();
-
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
         Self {
             selected_comport: "".to_owned(),
-            comports: serial_ports
-                .iter()
-                .map(|port| port.port_name.clone())
-                .collect(),
             buadrates: vec![
                 110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 230400,
                 460800, 921600,
@@ -132,17 +125,15 @@ impl eframe::App for Terminal {
                     })
                     .collect();
             });
-            ui.separator();
             if self.sessions.len() > 0 {
+                ui.separator();
                 terminal(ui, &mut self.sessions[self.selected_session]);
             }
-            ui.separator();
         });
         if self.serial_settings_flag {
             match new_session_window(
                 ctx,
                 &mut self.selected_comport,
-                &self.comports,
                 &self.buadrates,
                 &mut self.serial_settings_flag,
             ) {

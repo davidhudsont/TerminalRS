@@ -196,13 +196,17 @@ pub fn tab(ui: &mut Ui, name: impl Into<WidgetText>, checked: bool) -> Action {
 pub fn serial_settings(
     ui: &mut Ui,
     selected_comport: &mut String,
-    comports: &Vec<String>,
     baud_rates: &Vec<u32>,
     port_settings: &mut SerialPortSettings,
 ) {
     ui.group(|ui| {
         ui.label("Serial Parameters");
-        comport_setting_combo_box(ui, selected_comport, &comports);
+        let serial_ports: Vec<String> = serialport::available_ports()
+            .unwrap()
+            .iter()
+            .map(|port| port.port_name.clone())
+            .collect();
+        comport_setting_combo_box(ui, selected_comport, &serial_ports);
         buadrate_setting_combo_box(ui, &mut port_settings.baud_rate, &baud_rates);
         databits_setting_combo_box(ui, &mut port_settings.data_bits);
         flowcontrol_setting_combo_box(ui, &mut port_settings.flow_control);
@@ -240,7 +244,6 @@ pub fn connected_button(
 pub fn new_session_window(
     ctx: &egui::Context,
     selected_comport: &mut String,
-    comports: &Vec<String>,
     baud_rates: &Vec<u32>,
     open: &mut bool,
 ) -> Option<Session> {
@@ -251,13 +254,7 @@ pub fn new_session_window(
         .open(open)
         .default_size(vec2(200.0, 200.0))
         .show(ctx, |ui| {
-            serial_settings(
-                ui,
-                selected_comport,
-                comports,
-                baud_rates,
-                &mut port_settings,
-            );
+            serial_settings(ui, selected_comport, baud_rates, &mut port_settings);
             ui.add_space(20.0);
             ui.vertical_centered(|ui| {
                 connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
@@ -293,6 +290,7 @@ pub fn terminal(ui: &mut Ui, session: &mut Session) {
                             match session.port.as_mut() {
                                 Some(serial_port) => {
                                     serial_port.write(text.as_bytes()).unwrap();
+                                    ui.scroll_to_cursor(Some(Align::BOTTOM));
                                 }
                                 None => (),
                             }
@@ -305,12 +303,13 @@ pub fn terminal(ui: &mut Ui, session: &mut Session) {
                     } => match session.port.as_mut() {
                         Some(serial_port) => {
                             serial_port.write("\r\n".as_bytes()).unwrap();
+                            ui.scroll_to_cursor(Some(Align::BOTTOM));
                         }
                         None => (),
                     },
-                    _ => (),
+                    Event::Scroll(_) => (),
+                    _ => ui.scroll_to_cursor(Some(Align::BOTTOM)),
                 };
-                ui.scroll_to_cursor(Some(Align::BOTTOM));
             }
 
             match session.port.as_mut() {
