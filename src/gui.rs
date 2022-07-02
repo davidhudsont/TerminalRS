@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use eframe::{
-    egui::{self, epaint::vec2, Event, Key, Response, Ui, WidgetText},
+    egui::{self, epaint::vec2, util::undoer::Settings, Event, Key, Response, Ui, WidgetText},
     emath::Align,
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
@@ -23,11 +23,19 @@ pub struct SerialPortSettings {
 
 pub struct Session {
     pub name: String,
+    pub buffer: String,
+    pub settings: SerialPortSettings,
+    pub port: Option<Box<dyn SerialPort>>,
 }
 
 impl Session {
-    fn new(name: String) -> Self {
-        Self { name: name }
+    fn new(name: String, settings: SerialPortSettings, port: Option<Box<dyn SerialPort>>) -> Self {
+        Self {
+            name: name,
+            buffer: String::default(),
+            settings: settings,
+            port: port,
+        }
     }
 }
 
@@ -35,6 +43,9 @@ impl Default for Session {
     fn default() -> Self {
         Self {
             name: Default::default(),
+            buffer: String::default(),
+            settings: SerialPortSettings::default(),
+            port: None,
         }
     }
 }
@@ -252,18 +263,42 @@ pub fn serial_settings_window(
     }
 }
 
-pub fn setup_window(ctx: &egui::Context, open: &mut bool) -> Option<Session> {
+pub fn setup_window(
+    ctx: &egui::Context,
+    selected_comport: &mut String,
+    comports: &Vec<String>,
+    baud_rates: &Vec<u32>,
+    open: &mut bool,
+) -> Option<Session> {
     let mut result = None;
-    let mut text = "TERM".to_owned();
+    let mut port_settings = SerialPortSettings::default();
+    let mut serial_port: Option<Box<dyn SerialPort>> = None;
     egui::Window::new("NewSession")
         .default_size(vec2(200.0, 200.0))
         .show(ctx, |ui| {
-            ui.add(egui::TextEdit::singleline(&mut text));
-            if ui.button("Connect").clicked() {
-                *open = false;
-                result = Some(Session::new(text.clone()));
-            }
+            serial_settings(
+                ui,
+                selected_comport,
+                comports,
+                baud_rates,
+                &mut port_settings,
+            );
+            connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
+            // This line allows for freely resizable windows
+            ui.allocate_space(ui.available_size());
         });
+
+    match serial_port {
+        Some(port) => {
+            *open = false;
+            result = Some(Session::new(
+                selected_comport.clone(),
+                port_settings,
+                Some(port),
+            ));
+        }
+        None => (),
+    }
     result
 }
 

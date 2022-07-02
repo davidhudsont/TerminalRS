@@ -25,7 +25,7 @@ struct Terminal {
     serial_port: Option<Box<dyn SerialPort>>,
     port_settings: SerialPortSettings,
     sessions: Vec<Session>,
-    selected_session: String,
+    selected_session: usize,
 }
 
 impl Terminal {
@@ -49,7 +49,7 @@ impl Terminal {
             serial_port: None,
             port_settings: SerialPortSettings::default(),
             sessions: vec![],
-            selected_session: String::default(),
+            selected_session: 0,
         }
     }
 }
@@ -94,21 +94,12 @@ impl eframe::App for Terminal {
             ui.horizontal(|ui| {
                 self.sessions = std::mem::take(&mut self.sessions)
                     .into_iter()
-                    .filter_map(|session| {
-                        let checked = self.selected_session == session.name;
-                        match tab(ui, &session.name, checked) {
-                            Action::Select => Some(session),
-                            Action::Delete => None,
-                            Action::None => Some(session),
-                        }
+                    .filter_map(|session| match tab(ui, &session.name, false) {
+                        Action::Select => Some(session),
+                        Action::Delete => None,
+                        Action::None => Some(session),
                     })
                     .collect();
-                if ui.button("+").clicked() {
-                    let len = self.sessions.len();
-                    self.sessions.push(Session {
-                        name: format!("TERM{}", len),
-                    });
-                }
             });
             ui.horizontal(|ui| {
                 comport_setting_combo_box(ui, &mut self.selected_comport, &self.comports);
@@ -142,11 +133,13 @@ impl eframe::App for Terminal {
                 }
             });
             ui.separator();
-            match self.serial_port.as_mut() {
-                Some(serial_port) => {
-                    terminal(ui, &mut self.console_text, serial_port);
+            if self.sessions.len() > 0 {
+                match self.sessions[0].port.as_mut() {
+                    Some(serial_port) => {
+                        terminal(ui, &mut self.console_text, serial_port);
+                    }
+                    None => (),
                 }
-                None => (),
             }
             ui.separator();
         });
@@ -160,8 +153,16 @@ impl eframe::App for Terminal {
         //     &mut self.serial_settings_flag,
         // );
         if self.serial_settings_flag {
-            match setup_window(ctx, &mut self.serial_settings_flag) {
-                Some(session) => self.sessions.push(session),
+            match setup_window(
+                ctx,
+                &mut self.selected_comport,
+                &self.comports,
+                &self.buadrates,
+                &mut self.serial_settings_flag,
+            ) {
+                Some(session) => {
+                    self.sessions.push(session);
+                }
                 None => (),
             }
         }
