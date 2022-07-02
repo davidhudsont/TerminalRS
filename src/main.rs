@@ -10,7 +10,7 @@ use xmodem::XModem;
 fn main() {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "651R2/A Firmware Upgrade Application",
+        "TerminalRS",
         options,
         Box::new(|cc| Box::new(Terminal::new(cc))),
     );
