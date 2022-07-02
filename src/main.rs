@@ -25,20 +25,7 @@ struct Terminal {
     serial_port: Option<Box<dyn SerialPort>>,
     port_settings: SerialPortSettings,
     sessions: Vec<Session>,
-}
-
-struct Session {
-    name: String,
-    checked: bool,
-}
-
-impl Default for Session {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            checked: Default::default(),
-        }
-    }
+    selected_session: String,
 }
 
 impl Terminal {
@@ -62,6 +49,7 @@ impl Terminal {
             serial_port: None,
             port_settings: SerialPortSettings::default(),
             sessions: vec![],
+            selected_session: String::default(),
         }
     }
 }
@@ -104,22 +92,22 @@ impl eframe::App for Terminal {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                for session in &mut self.sessions {
-                    match tab(ui, &session.name, session.checked) {
-                        Action::Select => {
-                            println!("Selected");
-                            session.checked = true;
+                self.sessions = std::mem::take(&mut self.sessions)
+                    .into_iter()
+                    .filter_map(|session| {
+                        let checked = self.selected_session == session.name;
+                        match tab(ui, &session.name, checked) {
+                            Action::Select => Some(session),
+                            Action::Delete => None,
+                            Action::None => Some(session),
                         }
-                        Action::Delete => println!("Delete"),
-                        Action::None => (),
-                    }
-                }
+                    })
+                    .collect();
                 if ui.button("+").clicked() {
                     let len = self.sessions.len();
                     self.sessions.push(Session {
                         name: format!("TERM{}", len),
-                        checked: false,
-                    })
+                    });
                 }
             });
             ui.horizontal(|ui| {
@@ -162,15 +150,21 @@ impl eframe::App for Terminal {
             }
             ui.separator();
         });
-        serial_settings_window(
-            ctx,
-            &mut self.selected_comport,
-            &self.comports,
-            &self.buadrates,
-            &mut self.port_settings,
-            &mut self.serial_port,
-            &mut self.serial_settings_flag,
-        );
+        // serial_settings_window(
+        //     ctx,
+        //     &mut self.selected_comport,
+        //     &self.comports,
+        //     &self.buadrates,
+        //     &mut self.port_settings,
+        //     &mut self.serial_port,
+        //     &mut self.serial_settings_flag,
+        // );
+        if self.serial_settings_flag {
+            match setup_window(ctx, &mut self.serial_settings_flag) {
+                Some(session) => self.sessions.push(session),
+                None => (),
+            }
+        }
         ctx.request_repaint();
     }
 }

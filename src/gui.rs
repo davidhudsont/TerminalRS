@@ -21,6 +21,24 @@ pub struct SerialPortSettings {
     pub timeout: u64,
 }
 
+pub struct Session {
+    pub name: String,
+}
+
+impl Session {
+    fn new(name: String) -> Self {
+        Self { name: name }
+    }
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+        }
+    }
+}
+
 pub fn read_byte(port: &mut Box<dyn SerialPort>) -> String {
     let mut string: Vec<u8> = vec![];
     let mut read_buffer: Vec<u8> = vec![0; 1];
@@ -232,6 +250,21 @@ pub fn serial_settings_window(
         Some(_) => *open = false,
         None => (),
     }
+}
+
+pub fn setup_window(ctx: &egui::Context, open: &mut bool) -> Option<Session> {
+    let mut result = None;
+    let mut text = "TERM".to_owned();
+    egui::Window::new("NewSession")
+        .default_size(vec2(200.0, 200.0))
+        .show(ctx, |ui| {
+            ui.add(egui::TextEdit::singleline(&mut text));
+            if ui.button("Connect").clicked() {
+                *open = false;
+                result = Some(Session::new(text.clone()));
+            }
+        });
+    result
 }
 
 pub fn terminal(ui: &mut Ui, console_text: &mut String, serial_port: &mut Box<dyn SerialPort>) {
