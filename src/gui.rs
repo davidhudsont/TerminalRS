@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use eframe::{
-    egui::{self, epaint::vec2, util::undoer::Settings, Event, Key, Response, Ui, WidgetText},
+    egui::{self, epaint::vec2, Event, Key, Response, Ui, WidgetText},
     emath::Align,
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
@@ -237,33 +237,7 @@ pub fn connected_button(
     }
 }
 
-pub fn serial_settings_window(
-    ctx: &egui::Context,
-    selected_comport: &mut String,
-    comports: &Vec<String>,
-    baud_rates: &Vec<u32>,
-    port_settings: &mut SerialPortSettings,
-    serial_port: &mut Option<Box<dyn SerialPort>>,
-    open: &mut bool,
-) {
-    egui::Window::new("Serial Settings")
-        .open(open)
-        .default_size(vec2(200.0, 200.0))
-        .collapsible(true)
-        .show(ctx, |ui| {
-            serial_settings(ui, selected_comport, comports, baud_rates, port_settings);
-            connected_button(ui, selected_comport, port_settings, serial_port);
-            // This line allows for freely resizable windows
-            ui.allocate_space(ui.available_size());
-        });
-
-    match serial_port {
-        Some(_) => *open = false,
-        None => (),
-    }
-}
-
-pub fn setup_window(
+pub fn new_session_window(
     ctx: &egui::Context,
     selected_comport: &mut String,
     comports: &Vec<String>,
@@ -273,7 +247,8 @@ pub fn setup_window(
     let mut result = None;
     let mut port_settings = SerialPortSettings::default();
     let mut serial_port: Option<Box<dyn SerialPort>> = None;
-    egui::Window::new("NewSession")
+    egui::Window::new("New Session")
+        .open(open)
         .default_size(vec2(200.0, 200.0))
         .show(ctx, |ui| {
             serial_settings(
@@ -283,9 +258,13 @@ pub fn setup_window(
                 baud_rates,
                 &mut port_settings,
             );
-            connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
+            ui.add_space(20.0);
+            ui.vertical_centered(|ui| {
+                connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
+            });
+            ui.add_space(10.0);
             // This line allows for freely resizable windows
-            ui.allocate_space(ui.available_size());
+            // ui.allocate_space(ui.available_size());
         });
 
     match serial_port {
@@ -302,33 +281,47 @@ pub fn setup_window(
     result
 }
 
-pub fn terminal(ui: &mut Ui, console_text: &mut String, serial_port: &mut Box<dyn SerialPort>) {
+pub fn terminal(ui: &mut Ui, session: &mut Session) {
     egui::ScrollArea::vertical().show(ui, |ui| {
-        if selectable_text(ui, console_text).has_focus() {
+        if selectable_text(ui, &session.buffer).has_focus() {
             let events = ui.input().events.clone(); // avoid dead-lock by cloning. TODO: optimize
             for event in &events {
                 match event {
                     Event::Text(text) => {
                         // Newlines are handled by `Key::Enter`.
                         if !text.is_empty() && text != "\n" && text != "\r" {
-                            serial_port.write(text.as_bytes()).unwrap();
+                            match session.port.as_mut() {
+                                Some(serial_port) => {
+                                    serial_port.write(text.as_bytes()).unwrap();
+                                }
+                                None => (),
+                            }
                         }
                     }
                     Event::Key {
                         key: Key::Enter,
                         pressed: true,
                         ..
-                    } => {
-                        serial_port.write("\r\n".as_bytes()).unwrap();
-                    }
+                    } => match session.port.as_mut() {
+                        Some(serial_port) => {
+                            serial_port.write("\r\n".as_bytes()).unwrap();
+                        }
+                        None => (),
+                    },
                     _ => (),
                 };
                 ui.scroll_to_cursor(Some(Align::BOTTOM));
             }
-            let result = read_byte(serial_port);
-            if result.len() > 0 {
-                console_text.push_str(&result);
-                ui.scroll_to_cursor(Some(Align::BOTTOM));
+
+            match session.port.as_mut() {
+                Some(serial_port) => {
+                    let result = read_byte(serial_port);
+                    if result.len() > 0 {
+                        session.buffer.push_str(&result);
+                        ui.scroll_to_cursor(Some(Align::BOTTOM));
+                    }
+                }
+                None => (),
             }
         }
     });
