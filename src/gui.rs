@@ -302,6 +302,7 @@ pub fn edit_session_setting(
                 session.port = None;
                 match create_serial_port_button(ui, selected_comport, &mut session.settings) {
                     Some(port) => {
+                        session.name = selected_comport.clone();
                         session.port = Some(port);
                         close = true;
                     }
