@@ -220,12 +220,11 @@ pub fn serial_settings(
     });
 }
 
-pub fn connected_button(
+pub fn create_serial_port_button(
     ui: &mut Ui,
     selected_comport: &mut String,
     port_settings: &mut SerialPortSettings,
-    serial_port: &mut Option<Box<dyn SerialPort>>,
-) {
+) -> Option<Box<dyn SerialPort>> {
     if ui.button("Connect").clicked() {
         if selected_comport.len() > 0 {
             if let Ok(port) = serialport::new(selected_comport.clone(), port_settings.baud_rate)
@@ -237,12 +236,14 @@ pub fn connected_button(
                 .open()
             {
                 println!("Opened the Serial Port!");
-                *serial_port = Some(port);
+                return Some(port);
             } else {
                 println!("Can't open port");
+                return None;
             }
         }
     }
+    None
 }
 
 pub fn new_session_window(
@@ -260,7 +261,10 @@ pub fn new_session_window(
             serial_settings(ui, selected_comport, &mut port_settings);
             ui.add_space(20.0);
             ui.vertical_centered(|ui| {
-                connected_button(ui, selected_comport, &mut port_settings, &mut serial_port);
+                match create_serial_port_button(ui, selected_comport, &mut port_settings) {
+                    Some(port) => serial_port = Some(port),
+                    None => (),
+                }
             });
             ui.add_space(10.0);
             // This line allows for freely resizable windows
@@ -279,6 +283,38 @@ pub fn new_session_window(
         None => (),
     }
     result
+}
+
+pub fn edit_session_setting(
+    ctx: &egui::Context,
+    open: &mut bool,
+    selected_comport: &mut String,
+    session: &mut Session,
+) {
+    let mut close = false;
+    egui::Window::new("Edit Settings")
+        .open(open)
+        .default_size(vec2(200.0, 200.0))
+        .show(ctx, |ui| {
+            serial_settings(ui, selected_comport, &mut session.settings);
+            ui.add_space(20.0);
+            ui.vertical_centered(|ui| {
+                session.port = None;
+                match create_serial_port_button(ui, selected_comport, &mut session.settings) {
+                    Some(port) => {
+                        session.port = Some(port);
+                        close = true;
+                    }
+                    None => (),
+                }
+            });
+            ui.add_space(10.0);
+            // This line allows for freely resizable windows
+            // ui.allocate_space(ui.available_size());
+        });
+    if close {
+        *open = false;
+    }
 }
 
 pub fn terminal(ui: &mut Ui, session: &mut Session) {

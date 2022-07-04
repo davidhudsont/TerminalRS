@@ -39,6 +39,7 @@ struct Terminal {
     serial_settings_flag: bool,
     sessions: Vec<Session>,
     selected_session: usize,
+    edit_settings_flag: bool,
 }
 
 impl Terminal {
@@ -50,6 +51,7 @@ impl Terminal {
             serial_settings_flag: false,
             sessions: vec![],
             selected_session: 0,
+            edit_settings_flag: false,
         }
     }
 }
@@ -97,6 +99,12 @@ impl eframe::App for Terminal {
                         self.serial_settings_flag = true;
                         ui.close_menu();
                     }
+                    if self.sessions.len() > 0 {
+                        if ui.button("Edit Session").clicked() {
+                            self.edit_settings_flag = true;
+                            ui.close_menu();
+                        }
+                    }
                 });
             });
         });
@@ -139,6 +147,14 @@ impl eframe::App for Terminal {
                 }
                 None => (),
             }
+        }
+        if self.edit_settings_flag {
+            edit_session_setting(
+                ctx,
+                &mut self.edit_settings_flag,
+                &mut self.selected_comport,
+                &mut self.sessions[self.selected_session],
+            );
         }
         ctx.request_repaint();
     }
