@@ -64,7 +64,7 @@ impl eframe::App for Terminal {
                     if ui.button("xModem Send").clicked() {
                         ui.close_menu();
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
-                            if self.sessions.len() > 0 {
+                            if !self.sessions.is_empty() {
                                 match self.sessions[self.selected_session].port.as_mut() {
                                     Some(port) => {
                                         let picked_path = path.display().to_string();
@@ -80,7 +80,7 @@ impl eframe::App for Terminal {
                     if ui.button("xModem Receive").clicked() {
                         ui.close_menu();
                         if let Some(path) = rfd::FileDialog::new().save_file() {
-                            if self.sessions.len() > 0 {
+                            if !self.sessions.is_empty() {
                                 match self.sessions[self.selected_session].port.as_mut() {
                                     Some(port) => {
                                         let picked_path = path.display().to_string();
@@ -99,11 +99,9 @@ impl eframe::App for Terminal {
                         self.serial_settings_flag = true;
                         ui.close_menu();
                     }
-                    if self.sessions.len() > 0 {
-                        if ui.button("Edit Session").clicked() {
-                            self.edit_settings_flag = true;
-                            ui.close_menu();
-                        }
+                    if !self.sessions.is_empty() && ui.button("Edit Session").clicked() {
+                        self.edit_settings_flag = true;
+                        ui.close_menu();
                     }
                 });
             });
@@ -131,7 +129,7 @@ impl eframe::App for Terminal {
                     })
                     .collect();
             });
-            if self.sessions.len() > 0 {
+            if !self.sessions.is_empty() {
                 ui.separator();
                 terminal(ui, &mut self.sessions[self.selected_session]);
             }

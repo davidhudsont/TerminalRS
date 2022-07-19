@@ -21,31 +21,21 @@ pub struct SerialPortSettings {
     pub timeout: u64,
 }
 
+#[derive(Default)]
 pub struct Session {
     pub name: String,
-    pub buffer: String,
     pub settings: SerialPortSettings,
     pub port: Option<Box<dyn SerialPort>>,
+    pub buffer: String,
 }
 
 impl Session {
     fn new(name: String, settings: SerialPortSettings, port: Option<Box<dyn SerialPort>>) -> Self {
         Self {
-            name: name,
-            buffer: String::default(),
-            settings: settings,
-            port: port,
-        }
-    }
-}
-
-impl Default for Session {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            buffer: String::default(),
-            settings: SerialPortSettings::default(),
-            port: None,
+            name,
+            settings,
+            port,
+            ..Default::default()
         }
     }
 }
@@ -94,7 +84,7 @@ pub fn comport_setting_combo_box(
     ui.horizontal(|ui| {
         ui.label("COMM:");
         egui::ComboBox::from_id_source("COMPORT")
-            .selected_text(format!("{}", selected_comport))
+            .selected_text(selected_comport.to_string())
             .show_ui(ui, |ui| {
                 for comport in comports {
                     ui.selectable_value(selected_comport, comport.to_string(), comport);
@@ -225,22 +215,20 @@ pub fn create_serial_port_button(
     selected_comport: &mut String,
     port_settings: &mut SerialPortSettings,
 ) -> Option<Box<dyn SerialPort>> {
-    if ui.button("Connect").clicked() {
-        if selected_comport.len() > 0 {
-            if let Ok(port) = serialport::new(selected_comport.clone(), port_settings.baud_rate)
-                .data_bits(port_settings.data_bits)
-                .flow_control(port_settings.flow_control)
-                .parity(port_settings.parity)
-                .stop_bits(port_settings.stop_bits)
-                .timeout(Duration::from_millis(port_settings.timeout))
-                .open()
-            {
-                println!("Opened the Serial Port!");
-                return Some(port);
-            } else {
-                println!("Can't open port");
-                return None;
-            }
+    if ui.button("Connect").clicked() && !selected_comport.is_empty() {
+        if let Ok(port) = serialport::new(selected_comport.clone(), port_settings.baud_rate)
+            .data_bits(port_settings.data_bits)
+            .flow_control(port_settings.flow_control)
+            .parity(port_settings.parity)
+            .stop_bits(port_settings.stop_bits)
+            .timeout(Duration::from_millis(port_settings.timeout))
+            .open()
+        {
+            println!("Opened the Serial Port!");
+            return Some(port);
+        } else {
+            println!("Can't open port");
+            return None;
         }
     }
     None
@@ -329,7 +317,7 @@ pub fn terminal(ui: &mut Ui, session: &mut Session) {
                         if !text.is_empty() && text != "\n" && text != "\r" {
                             match session.port.as_mut() {
                                 Some(serial_port) => {
-                                    serial_port.write(text.as_bytes()).unwrap();
+                                    let _ = serial_port.write(text.as_bytes());
                                     ui.scroll_to_cursor(Some(Align::BOTTOM));
                                 }
                                 None => (),
@@ -342,7 +330,7 @@ pub fn terminal(ui: &mut Ui, session: &mut Session) {
                         ..
                     } => match session.port.as_mut() {
                         Some(serial_port) => {
-                            serial_port.write("\r\n".as_bytes()).unwrap();
+                            let _ = serial_port.write("\r\n".as_bytes());
                             ui.scroll_to_cursor(Some(Align::BOTTOM));
                         }
                         None => (),
@@ -355,7 +343,7 @@ pub fn terminal(ui: &mut Ui, session: &mut Session) {
             match session.port.as_mut() {
                 Some(serial_port) => {
                     let result = read_byte(serial_port);
-                    if result.len() > 0 {
+                    if !result.is_empty() {
                         session.buffer.push_str(&result);
                         ui.scroll_to_cursor(Some(Align::BOTTOM));
                     }

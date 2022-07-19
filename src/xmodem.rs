@@ -27,7 +27,7 @@ impl XModem {
 
     fn send_byte(&mut self, device: &mut Box<dyn SerialPort>, byte: u8) {
         let packet: Vec<u8> = vec![byte];
-        device.write(&packet[..]).expect("Failed to send byte");
+        let _ = device.write(&packet[..]);
     }
 
     fn read_byte(&mut self, device: &mut Box<dyn SerialPort>) -> Result<u8, std::io::Error> {
@@ -50,7 +50,7 @@ impl XModem {
         let mut cancel = false;
         // Synchronization
         let buf = if crc_mode { vec![CRC] } else { vec![NAK] };
-        device.write(&buf[..]).expect("Sync I/O failure");
+        let _ = device.write(&buf[..]);
         // Receive Packets
         let mut data_length: usize = 128;
         let mut packet_num: u8 = 1;
@@ -71,7 +71,7 @@ impl XModem {
                             continue;
                         }
                         _ => {
-                            device.write(&buf[..]).expect("Sync I/O failure");
+                            let _ = device.write(&buf[..]);
                             errors += 1;
                             if errors > self.retries {
                                 return Err(
@@ -104,12 +104,7 @@ impl XModem {
 
                     let pn1 = packet[0];
                     let pn2 = packet[1];
-                    if (pn1 + pn2) != 0xff {
-                        println!("Error Packet Number was not expected");
-                        errors += 1;
-                        self.send_byte(device, NAK);
-                        continue;
-                    } else if pn1 != packet_num {
+                    if ((pn1 + pn2) != 0xff) || pn1 != packet_num {
                         println!("Error Packet Number was not expected");
                         errors += 1;
                         self.send_byte(device, NAK);
@@ -143,10 +138,7 @@ impl XModem {
                     }
 
                     size += data_length;
-                    stream
-                        .as_mut()
-                        .write(&packet[2..packet_length - 1])
-                        .expect("Failed to write to stream");
+                    let _ = stream.as_mut().write(&packet[2..packet_length - 1]);
                     println!("Send ACK");
                     self.send_byte(device, ACK);
                     if packet_num == 255 {
@@ -241,7 +233,7 @@ impl XModem {
                         packet.push(packet_num);
                         packet.push(seq2);
                         for val in &data {
-                            packet.push(val.clone());
+                            packet.push(*val);
                         }
 
                         if crc_mode {
@@ -256,7 +248,7 @@ impl XModem {
                             println!("Checksum: {}", checksum);
                             packet.push(checksum);
                         }
-                        device.write(&packet[..]).expect("Failed to Send Bytes");
+                        let _ = device.write(&packet[..]);
                         println!("Packet to send: {:?}", packet);
                         device
                             .clear(serialport::ClearBuffer::Input)
@@ -343,24 +335,23 @@ impl XModem {
 /// Calculates 8bit XModem checksum
 fn checksum(data: &[u8]) -> u8 {
     let sum: u32 = data.iter().map(|&val| val as u32).sum();
-    let checksum = (sum % 256) as u8;
-    return checksum;
+    (sum % 256) as u8
 }
 
 /// Calculate 16bit XModem CRC
 fn crc(data: &[u8]) -> u16 {
     let mut crc = 0;
     for val in data {
-        let item: i32 = val.clone().into();
-        crc = crc ^ (item << 8);
+        let item: i32 = (*val).into();
+        crc ^= item << 8;
         for _ in 0..8 {
-            crc = crc << 1;
+            crc <<= 1;
             if crc & 0x10000 > 0 {
                 crc = (crc ^ 0x1021) & 0xffff;
             }
         }
     }
-    return crc as u16;
+    crc as u16
 }
 
 #[cfg(test)]
