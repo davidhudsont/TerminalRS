@@ -6,6 +6,7 @@ use eframe::{
 };
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 
+#[derive(Clone)]
 pub struct SerialPortSettings {
     /// The baud rate in symbols-per-second
     pub baud_rate: u32,
@@ -237,19 +238,19 @@ pub fn create_serial_port_button(
 pub fn new_session_window(
     ctx: &egui::Context,
     selected_comport: &mut String,
+    selected_settings: &mut SerialPortSettings,
     open: &mut bool,
 ) -> Option<Session> {
     let mut result = None;
-    let mut port_settings = SerialPortSettings::default();
     let mut serial_port: Option<Box<dyn SerialPort>> = None;
     egui::Window::new("New Session")
         .open(open)
         .default_size(vec2(200.0, 200.0))
         .show(ctx, |ui| {
-            serial_settings(ui, selected_comport, &mut port_settings);
+            serial_settings(ui, selected_comport, selected_settings);
             ui.add_space(20.0);
             ui.vertical_centered(|ui| {
-                match create_serial_port_button(ui, selected_comport, &mut port_settings) {
+                match create_serial_port_button(ui, selected_comport, selected_settings) {
                     Some(port) => serial_port = Some(port),
                     None => (),
                 }
@@ -264,7 +265,7 @@ pub fn new_session_window(
             *open = false;
             result = Some(Session::new(
                 selected_comport.clone(),
-                port_settings,
+                selected_settings.clone(),
                 Some(port),
             ));
         }

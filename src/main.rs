@@ -36,6 +36,7 @@ fn xmodem_recieve(picked_path: String, port: &mut Box<dyn SerialPort>) {
 
 struct Terminal {
     selected_comport: String,
+    selected_setting: SerialPortSettings,
     serial_settings_flag: bool,
     sessions: Vec<Session>,
     selected_session: usize,
@@ -48,6 +49,7 @@ impl Terminal {
 
         Self {
             selected_comport: "".to_owned(),
+            selected_setting: SerialPortSettings::default(),
             serial_settings_flag: false,
             sessions: vec![],
             selected_session: 0,
@@ -138,6 +140,7 @@ impl eframe::App for Terminal {
             match new_session_window(
                 ctx,
                 &mut self.selected_comport,
+                &mut self.selected_setting,
                 &mut self.serial_settings_flag,
             ) {
                 Some(session) => {
