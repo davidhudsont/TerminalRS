@@ -3,7 +3,6 @@ mod xmodem;
 
 use eframe::egui;
 use gui::*;
-use serialport::SerialPort;
 use std::fs::File;
 use xmodem::XModem;
 
@@ -16,24 +15,6 @@ fn main() {
     );
 }
 
-fn xmodem_send(picked_path: String, port: &mut Box<dyn SerialPort>) {
-    let stream = File::open(picked_path).unwrap();
-    match XModem::new().send(port, Box::new(stream)) {
-        Ok(()) => println!("File Send success"),
-        Err(err) => println!("Error: {err}"),
-    }
-}
-
-fn xmodem_recieve(picked_path: String, port: &mut Box<dyn SerialPort>) {
-    let stream = File::create(picked_path).unwrap();
-    match XModem::new().receive(port, Box::new(stream), false) {
-        Ok(bytes) => {
-            println!("File Receive success, Bytes: {bytes} read.")
-        }
-        Err(err) => println!("Error: {err}"),
-    }
-}
-
 struct Terminal {
     selected_comport: String,
     selected_setting: SerialPortSettings,
@@ -41,6 +22,7 @@ struct Terminal {
     sessions: Vec<Session>,
     selected_session: usize,
     edit_settings_flag: bool,
+    popup_manager: PopUpManager,
 }
 
 impl Terminal {
@@ -54,7 +36,44 @@ impl Terminal {
             sessions: vec![],
             selected_session: 0,
             edit_settings_flag: false,
+            popup_manager: PopUpManager::default(),
         }
+    }
+}
+
+#[derive(Default)]
+struct PopUpManager {
+    popups: Vec<(bool, String)>,
+}
+
+impl PopUpManager {
+    fn add_popup(&mut self, title: String) {
+        self.popups.push((true, title))
+    }
+
+    fn show(&mut self, ctx: &egui::Context) {
+        for i in 0..self.popups.len() {
+            let title = self.popups[i].1.clone();
+            let open = &mut self.popups[i].0;
+            let mut close = false;
+            egui::Window::new("Error").open(open).show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.label(title);
+                    if ui.button("Close").clicked() {
+                        close = true;
+                    }
+                });
+            });
+            if close {
+                *open = false;
+            }
+        }
+    }
+}
+
+impl Terminal {
+    fn add_popup(&mut self, title: String) {
+        self.popup_manager.add_popup(title);
     }
 }
 
@@ -70,12 +89,21 @@ impl eframe::App for Terminal {
                                 match self.sessions[self.selected_session].port.as_mut() {
                                     Some(port) => {
                                         let picked_path = path.display().to_string();
-                                        xmodem_send(picked_path, port);
+                                        let stream = File::open(picked_path).unwrap();
+                                        match XModem::new().send(port, Box::new(stream)) {
+                                            Ok(()) => {
+                                                self.add_popup("File Send success".to_string())
+                                            }
+                                            Err(err) => self.add_popup(format!("Error: {}", err)),
+                                        }
                                     }
-                                    None => println!("No connected serial port!"),
+                                    None => self
+                                        .popup_manager
+                                        .add_popup("No connected serial port!".to_string()),
                                 }
                             } else {
-                                println!("No connected serial port!")
+                                self.popup_manager
+                                    .add_popup("No connected serial port!".to_string());
                             }
                         }
                     }
@@ -86,12 +114,21 @@ impl eframe::App for Terminal {
                                 match self.sessions[self.selected_session].port.as_mut() {
                                     Some(port) => {
                                         let picked_path = path.display().to_string();
-                                        xmodem_recieve(picked_path, port);
+                                        let stream = File::create(picked_path).unwrap();
+                                        match XModem::new().receive(port, Box::new(stream), false) {
+                                            Ok(bytes) => {
+                                                self.add_popup(format!(
+                                                    "File Receive success, Bytes: {} read.",
+                                                    bytes
+                                                ));
+                                            }
+                                            Err(err) => self.add_popup(format!("Error: {}", err)),
+                                        }
                                     }
-                                    None => println!("No connected serial port!"),
+                                    None => self.add_popup("No connected serial port!".to_string()),
                                 }
                             } else {
-                                println!("No connected serial port!")
+                                self.add_popup("No connected serial port!".to_string());
                             }
                         }
                     }
@@ -157,6 +194,7 @@ impl eframe::App for Terminal {
                 &mut self.sessions[self.selected_session],
             );
         }
+        self.popup_manager.show(ctx);
         ctx.request_repaint();
     }
 }
