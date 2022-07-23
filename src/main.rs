@@ -97,13 +97,10 @@ impl eframe::App for Terminal {
                                             Err(err) => self.add_popup(format!("Error: {}", err)),
                                         }
                                     }
-                                    None => self
-                                        .popup_manager
-                                        .add_popup("No connected serial port!".to_string()),
+                                    None => self.add_popup("No connected serial port!".to_string()),
                                 }
                             } else {
-                                self.popup_manager
-                                    .add_popup("No connected serial port!".to_string());
+                                self.add_popup("No connected serial port!".to_string());
                             }
                         }
                     }
